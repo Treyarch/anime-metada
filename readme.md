@@ -1,0 +1,88 @@
+# Anime Metadata Updater
+This script processes a folder of anime series, updates ratings and genres from Jikan API, and translates plot/outline text to French using Claude API.
+
+## Requirements
+
+- Python 3.8+
+- Required packages: requests, xml.etree.ElementTree, anthropic
+- API access to Jikan (https://jikan.moe/) - no authentication required
+- Claude API key for translation (optional if only updating metadata)
+
+## Script Functionality
+
+1. Folder Traversal
+
+- Script recursively walks through the main anime folder and all subfolders
+- Looks for "tvshow.nfo" files which contain metadata for each anime series
+
+
+2. Metadata Extraction
+
+- Parses each tvshow.nfo file using XML parsing
+- Extracts the title, current plot, and outline information
+
+
+3. Jikan API Integration
+
+- Uses the extracted title to search the Jikan API
+- Endpoint: https://api.jikan.moe/v4/anime?q={title}
+- Retrieves community score/rating and genres for the anime
+
+
+4. Metadata Update
+
+- Updates the <rating> tag in the tvshow.nfo file with the score from Jikan
+- Replaces all <genre> tags with genres from the Jikan API
+- Handles cases where anime titles might not match exactly
+
+
+5. Plot Translation (Optional)
+
+- Uses Claude API to translate <plot> and <outline> tags from English to French
+- Preserves formatting and special characters in the translation
+- Can be skipped with --skip-translate or --rating-only options
+
+
+6. File Writing
+
+- Writes the modified XML back to the original tvshow.nfo file
+- Maintains original file structure and encoding
+
+
+7. Error Handling
+
+- Implements robust error handling for API failures
+- Logs issues with specific files or API responses
+- Continues processing other files if one fails
+
+
+8. Rate Limiting
+
+- Respects Jikan API rate limits (60 requests per minute, 3 requests per second)
+- Implements sophisticated rate limiting mechanism to prevent API throttling
+- Tracks request timestamps to ensure compliance with API limits
+
+
+9. Progress Reporting
+
+- Displays progress information during execution
+- Generates a summary of changes made upon completion
+
+
+## Configuration
+
+- Store the Claude API key securely (optional if only updating metadata)
+- Allow configuration of source folder path via command line arguments
+- Provide options to only update ratings or only translate descriptions
+
+## Usage Example
+
+```bash 
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --claude-api-key "your-api-key"
+```
+
+## Skip Translation Example
+
+```bash
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --skip-translate
+```
