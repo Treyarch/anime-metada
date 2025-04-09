@@ -1,5 +1,5 @@
 # Anime Metadata Updater
-This script processes a folder of anime series, updates ratings and genres from Jikan API, and translates plot/outline text to French using Claude API.
+This script processes a folder of anime series, updates ratings and genres from Jikan API, translates plot/outline text to French using Claude API, and manages MPAA ratings across episode files.
 
 ## Requirements
 
@@ -14,6 +14,7 @@ This script processes a folder of anime series, updates ratings and genres from 
 
 - Script recursively walks through the main anime folder and all subfolders
 - Looks for "tvshow.nfo" files which contain metadata for each anime series
+- Can also process episode NFO files for MPAA rating management
 
 
 2. Metadata Extraction
@@ -43,10 +44,11 @@ This script processes a folder of anime series, updates ratings and genres from 
 - Can be skipped with --skip-translate or --rating-only options
 
 
-6. File Writing
+6. MPAA Rating Management (Optional)
 
-- Writes the modified XML back to the original tvshow.nfo file
-- Maintains original file structure and encoding
+- Can sync MPAA ratings from tvshow.nfo to all episode NFO files in the series folder
+- Can remove MPAA ratings from all episode NFO files
+- Works with files named like "3X3 Eyes S02E03 [BDRIP][1080p x264 Multi].nfo"
 
 
 7. Error Handling
@@ -56,14 +58,20 @@ This script processes a folder of anime series, updates ratings and genres from 
 - Continues processing other files if one fails
 
 
-8. Rate Limiting
+8. File Writing
+
+- Writes the modified XML back to the original tvshow.nfo file
+- Maintains original file structure and encoding
+
+
+9. Rate Limiting
 
 - Respects Jikan API rate limits (60 requests per minute, 3 requests per second)
 - Implements sophisticated rate limiting mechanism to prevent API throttling
 - Tracks request timestamps to ensure compliance with API limits
 
 
-9. Progress Reporting
+10. Progress Reporting
 
 - Displays progress information during execution
 - Generates a summary of changes made upon completion
@@ -85,4 +93,14 @@ python anime_metadata_updater.py --folder "/path/to/anime/collection" --claude-a
 
 ```bash
 python anime_metadata_updater.py --folder "/path/to/anime/collection" --skip-translate
+```
+
+## MPAA Management Examples
+
+```bash
+# Sync MPAA ratings from tvshow.nfo to episode files
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --sync-mpaa
+
+# Remove MPAA ratings from all episode files
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --remove-mpaa
 ```

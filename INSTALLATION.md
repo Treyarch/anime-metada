@@ -28,6 +28,8 @@ python src/anime_metadata_updater.py --folder "/path/to/anime/collection" --clau
 - `--rating-only`: Only update ratings, skip translations
 - `--skip-translate`: Skip translation of descriptions entirely
 - `--force-update`: Force update of ratings even if they already exist
+- `--sync-mpaa`: Sync MPAA rating from tvshow.nfo to all episode NFO files
+- `--remove-mpaa`: Remove MPAA rating from all episode NFO files
 
 ### Examples
 
@@ -61,11 +63,30 @@ python src/anime_metadata_updater.py --folder "D:\anime\collection" --skip-trans
 python src/anime_metadata_updater.py --folder "D:\anime\collection\Attack on Titan" --claude-api-key "your-api-key"
 ```
 
+6. Sync MPAA ratings from tvshow.nfo to all episode NFO files:
+
+```bash
+python src/anime_metadata_updater.py --folder "D:\anime\collection" --sync-mpaa
+```
+
+7. Remove MPAA ratings from all episode NFO files:
+
+```bash
+python src/anime_metadata_updater.py --folder "D:\anime\collection" --remove-mpaa
+```
+
 ## Test with Example
 
 You can test the script with the included example:
 
 ```bash
+# Test MPAA sync functionality
+python src/anime_metadata_updater.py --folder "D:\www\anime-metadata\example" --sync-mpaa
+
+# Test MPAA removal functionality
+python src/anime_metadata_updater.py --folder "D:\www\anime-metadata\example" --remove-mpaa
+
+# Test normal functionality
 python src/anime_metadata_updater.py --folder "D:\www\anime-metadata\example" --claude-api-key "your-api-key"
 ```
 

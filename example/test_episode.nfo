@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<episodedetails>
+  <plot>Cet épisode contient des caractères accentués comme é, è, à, ç et des caractères japonais: 進撃の巨人</plot>
+  <title>Test avec caractères spéciaux</title>
+  <originaltitle>テスト オリジナル</originaltitle>
+  <season>1</season>
+  <episode>1</episode>
+  <showtitle>Série de Test</showtitle>
+</episodedetails>

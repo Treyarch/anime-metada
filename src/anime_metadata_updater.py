@@ -11,7 +11,9 @@ import sys
 import time
 import argparse
 import logging
+import re
 import xml.etree.ElementTree as ET
+import codecs
 import requests
 from anthropic import Anthropic
 
@@ -25,6 +27,53 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+def read_xml_file(file_path):
+    """
+    Read an XML file preserving encoding and return the content and encoding info.
+    """
+    # Check for BOM
+    with open(file_path, 'rb') as f:
+        first_bytes = f.read(4)
+        has_bom = first_bytes.startswith(b'\xef\xbb\xbf')
+    
+    # Read file with proper encoding
+    if has_bom:
+        with codecs.open(file_path, 'r', encoding='utf-8-sig') as f:
+            content = f.read()
+    else:
+        with codecs.open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    
+    return content, has_bom
+
+def write_xml_file(file_path, xml_string, has_bom=False):
+    """
+    Write XML content to file with proper encoding.
+    Preserves BOM if it was in the original file.
+    Ensures the XML declaration is exactly: <?xml version="1.0" encoding="utf-8" standalone="yes"?>
+    """
+    # Ensure xml_string is a string, not bytes
+    if isinstance(xml_string, bytes):
+        xml_string = xml_string.decode('utf-8')
+    
+    # Ensure the XML declaration is exactly what we want
+    # First, remove any XML declaration that might be there
+    if xml_string.startswith('<?xml'):
+        xml_string = xml_string[xml_string.find('?>')+2:].lstrip()
+    
+    # Add the exact XML declaration we want
+    xml_string = '<?xml version="1.0" encoding="utf-8" standalone="yes"?>\n' + xml_string
+        
+    # Add BOM if the original had it
+    if has_bom:
+        with open(file_path, 'wb') as f:
+            f.write(b'\xef\xbb\xbf')
+            f.write(xml_string.encode('utf-8'))
+    else:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(xml_string)
+
 
 class AnimeMetadataUpdater:
     """Main class for updating anime metadata."""
@@ -46,6 +95,7 @@ class AnimeMetadataUpdater:
             "updated_ratings": 0,
             "updated_genres": 0,
             "translated_plots": 0,
+            "episodes_updated": 0,
             "errors": 0
         }
         
@@ -61,6 +111,13 @@ class AnimeMetadataUpdater:
         """Main method to run the updater."""
         logger.info("Starting anime metadata update process")
         
+        # Check if we are only handling MPAA tags
+        if self.options.get('sync_mpaa', False) or self.options.get('remove_mpaa', False):
+            self._process_mpaa_tags()
+            self._print_summary()
+            return
+        
+        # Normal metadata updating
         for root, dirs, files in os.walk(self.folder_path):
             if 'tvshow.nfo' in files:
                 nfo_path = os.path.join(root, 'tvshow.nfo')
@@ -72,14 +129,158 @@ class AnimeMetadataUpdater:
         
         self._print_summary()
     
+    def _process_mpaa_tags(self):
+        """Process MPAA tags in episode NFO files based on tvshow.nfo."""
+        logger.info("Starting MPAA tag processing")
+        
+        for root, dirs, files in os.walk(self.folder_path):
+            # Check if there's a tvshow.nfo file
+            tvshow_path = os.path.join(root, 'tvshow.nfo')
+            if not os.path.exists(tvshow_path):
+                continue
+            
+            if self.options.get('sync_mpaa', False):
+                # Get the MPAA rating from tvshow.nfo
+                mpaa_value = self._get_mpaa_from_tvshow(tvshow_path)
+                if not mpaa_value:
+                    logger.warning(f"No MPAA tag found in {tvshow_path}, skipping folder")
+                    continue
+                
+                logger.info(f"Found MPAA rating '{mpaa_value}' in {tvshow_path}")
+            
+            # Find all episode NFO files in this folder
+            episode_nfos = []
+            for file in files:
+                if file.endswith('.nfo') and file != 'tvshow.nfo':
+                    episode_nfos.append(file)
+            
+            if not episode_nfos:
+                logger.info(f"No episode NFO files found in {root}")
+                continue
+            
+            logger.info(f"Found {len(episode_nfos)} episode NFO files in {root}")
+            
+            # Process each episode NFO file
+            for episode_file in episode_nfos:
+                episode_path = os.path.join(root, episode_file)
+                try:
+                    if self.options.get('sync_mpaa', False):
+                        self._add_mpaa_to_episode(episode_path, mpaa_value)
+                    elif self.options.get('remove_mpaa', False):
+                        self._remove_mpaa_from_episode(episode_path)
+                except Exception as e:
+                    logger.error(f"Error processing episode {episode_path}: {str(e)}")
+                    self.stats["errors"] += 1
+    
+    def _get_mpaa_from_tvshow(self, tvshow_path):
+        """Extract MPAA rating from tvshow.nfo file."""
+        try:
+            # Read the file content preserving encoding
+            xml_content, _ = read_xml_file(tvshow_path)
+            
+            # Parse the XML while preserving formatting
+            parser = ET.XMLParser(encoding='utf-8')
+            root = ET.fromstring(xml_content.encode('utf-8'), parser=parser)
+            
+            mpaa_elem = root.find('mpaa')
+            if mpaa_elem is not None and mpaa_elem.text:
+                return mpaa_elem.text.strip()
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error reading MPAA from {tvshow_path}: {str(e)}")
+            return None
+    
+    def _add_mpaa_to_episode(self, episode_path, mpaa_value):
+        """Add or update MPAA tag in episode NFO file."""
+        try:
+            # Read the file content preserving encoding
+            xml_content, has_bom = read_xml_file(episode_path)
+            
+            # Parse the XML while preserving formatting
+            parser = ET.XMLParser(encoding='utf-8')
+            root = ET.fromstring(xml_content.encode('utf-8'), parser=parser)
+            tree = ET.ElementTree(root)
+            
+            # Check if it's an episode XML format
+            if root.tag != 'episodedetails':
+                logger.warning(f"File {episode_path} is not an episode NFO, skipping")
+                return
+            
+            # Check if MPAA tag already exists
+            mpaa_elem = root.find('mpaa')
+            if mpaa_elem is None:
+                # Create new MPAA element
+                mpaa_elem = ET.SubElement(root, 'mpaa')
+                
+            # Update the MPAA value
+            if mpaa_elem.text != mpaa_value:
+                mpaa_elem.text = mpaa_value
+                
+                # Convert tree to string without the XML declaration (we'll add the exact one we want later)
+                xml_string = ET.tostring(root, encoding='utf-8', xml_declaration=False).decode('utf-8')
+                
+                # Write the file preserving encoding
+                write_xml_file(episode_path, xml_string, has_bom)
+                
+                logger.info(f"Updated MPAA rating to '{mpaa_value}' in {episode_path}")
+                self.stats["episodes_updated"] += 1
+            else:
+                logger.info(f"MPAA already set to '{mpaa_value}' in {episode_path}")
+                
+        except Exception as e:
+            logger.error(f"Error adding MPAA to {episode_path}: {str(e)}")
+            self.stats["errors"] += 1
+    
+    def _remove_mpaa_from_episode(self, episode_path):
+        """Remove MPAA tag from episode NFO file if it exists."""
+        try:
+            # Read the file content preserving encoding
+            xml_content, has_bom = read_xml_file(episode_path)
+            
+            # Parse the XML while preserving formatting
+            parser = ET.XMLParser(encoding='utf-8')
+            root = ET.fromstring(xml_content.encode('utf-8'), parser=parser)
+            tree = ET.ElementTree(root)
+            
+            # Check if it's an episode XML format
+            if root.tag != 'episodedetails':
+                logger.warning(f"File {episode_path} is not an episode NFO, skipping")
+                return
+            
+            # Find and remove MPAA tag if it exists
+            mpaa_elem = root.find('mpaa')
+            if mpaa_elem is not None:
+                root.remove(mpaa_elem)
+                
+                # Convert tree to string without the XML declaration (we'll add the exact one we want later)
+                xml_string = ET.tostring(root, encoding='utf-8', xml_declaration=False).decode('utf-8')
+                
+                # Write the file preserving encoding
+                write_xml_file(episode_path, xml_string, has_bom)
+                
+                logger.info(f"Removed MPAA rating from {episode_path}")
+                self.stats["episodes_updated"] += 1
+            else:
+                logger.info(f"No MPAA tag found in {episode_path}")
+                
+        except Exception as e:
+            logger.error(f"Error removing MPAA from {episode_path}: {str(e)}")
+            self.stats["errors"] += 1
+            
     def _process_nfo_file(self, nfo_path):
         """Process a single tvshow.nfo file."""
         logger.info(f"Processing: {nfo_path}")
         
         try:
-            # Parse the XML file
-            tree = ET.parse(nfo_path)
-            root = tree.getroot()
+            # Read the file content preserving encoding
+            xml_content, has_bom = read_xml_file(nfo_path)
+            
+            # Parse the XML while preserving formatting
+            parser = ET.XMLParser(encoding='utf-8')
+            root = ET.fromstring(xml_content.encode('utf-8'), parser=parser)
+            tree = ET.ElementTree(root)
             
             # Extract title and other info
             title_elem = root.find('title')
@@ -117,7 +318,12 @@ class AnimeMetadataUpdater:
             
             # Write back changes if any were made
             if changes_made:
-                tree.write(nfo_path, encoding='utf-8', xml_declaration=True)
+                # Convert tree to string manually
+                xml_string = ET.tostring(root, encoding='utf-8', xml_declaration=True).decode('utf-8')
+                
+                # Write the file preserving encoding
+                write_xml_file(nfo_path, xml_string, has_bom)
+                
                 logger.info(f"Updated file: {nfo_path}")
             else:
                 logger.info(f"No changes needed for: {nfo_path}")
@@ -318,10 +524,15 @@ class AnimeMetadataUpdater:
         logger.info("=" * 50)
         logger.info("PROCESSING COMPLETE")
         logger.info("=" * 50)
-        logger.info(f"Files processed: {self.stats['processed_files']}")
-        logger.info(f"Ratings updated: {self.stats['updated_ratings']}")
-        logger.info(f"Genres updated: {self.stats['updated_genres']}")
-        logger.info(f"Descriptions translated: {self.stats['translated_plots']}")
+        
+        if self.options.get('sync_mpaa', False) or self.options.get('remove_mpaa', False):
+            logger.info(f"Episode NFO files updated: {self.stats['episodes_updated']}")
+        else:
+            logger.info(f"Files processed: {self.stats['processed_files']}")
+            logger.info(f"Ratings updated: {self.stats['updated_ratings']}")
+            logger.info(f"Genres updated: {self.stats['updated_genres']}")
+            logger.info(f"Descriptions translated: {self.stats['translated_plots']}")
+            
         logger.info(f"Errors encountered: {self.stats['errors']}")
         logger.info("=" * 50)
 
@@ -336,12 +547,18 @@ def parse_arguments():
     parser.add_argument("--rating-only", action="store_true", help="Only update ratings, skip translations")
     parser.add_argument("--skip-translate", action="store_true", help="Skip translation of descriptions")
     parser.add_argument("--force-update", action="store_true", help="Force update of ratings even if they already exist")
+    parser.add_argument("--sync-mpaa", action="store_true", help="Sync MPAA rating from tvshow.nfo to all episode NFO files")
+    parser.add_argument("--remove-mpaa", action="store_true", help="Remove MPAA rating from all episode NFO files")
     
     args = parser.parse_args()
     
     # Validate that Claude API key is provided if translation is needed
-    if not args.rating_only and not args.skip_translate and not args.claude_api_key:
-        parser.error("--claude-api-key is required unless --rating-only or --skip-translate is specified")
+    if not args.rating_only and not args.skip_translate and not args.sync_mpaa and not args.remove_mpaa and not args.claude_api_key:
+        parser.error("--claude-api-key is required unless --rating-only, --skip-translate, --sync-mpaa, or --remove-mpaa is specified")
+    
+    # Validate that sync-mpaa and remove-mpaa are not used together
+    if args.sync_mpaa and args.remove_mpaa:
+        parser.error("--sync-mpaa and --remove-mpaa cannot be used together")
     
     return args
 
@@ -355,7 +572,9 @@ def main():
             "translate_only": args.translate_only,
             "rating_only": args.rating_only,
             "skip_translate": args.skip_translate,
-            "force_update": args.force_update
+            "force_update": args.force_update,
+            "sync_mpaa": args.sync_mpaa,
+            "remove_mpaa": args.remove_mpaa
         }
         
         updater = AnimeMetadataUpdater(
