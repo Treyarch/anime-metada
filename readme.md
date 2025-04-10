@@ -101,6 +101,9 @@ python anime_metadata_updater.py --folder "/path/to/anime/collection" --skip-tra
 # Sync MPAA ratings from tvshow.nfo to episode files
 python anime_metadata_updater.py --folder "/path/to/anime/collection" --sync-mpaa
 
+# Force-update MPAA ratings from tvshow.nfo to episode files
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --sync-mpaa --force-update
+
 # Remove MPAA ratings from all episode files
 python anime_metadata_updater.py --folder "/path/to/anime/collection" --remove-mpaa
 ```

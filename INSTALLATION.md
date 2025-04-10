@@ -27,7 +27,7 @@ python src/anime_metadata_updater.py --folder "/path/to/anime/collection" --clau
 - `--translate-only`: Only translate descriptions, skip rating updates
 - `--rating-only`: Only update ratings, skip translations
 - `--skip-translate`: Skip translation of descriptions entirely
-- `--force-update`: Force update of ratings even if they already exist
+- `--force-update`: Force update of ratings and MPAA values even if they already exist
 - `--sync-mpaa`: Sync MPAA rating from tvshow.nfo to all episode NFO files
 - `--remove-mpaa`: Remove MPAA rating from all episode NFO files
 
@@ -69,7 +69,13 @@ python src/anime_metadata_updater.py --folder "D:\anime\collection\Attack on Tit
 python src/anime_metadata_updater.py --folder "D:\anime\collection" --sync-mpaa
 ```
 
-7. Remove MPAA ratings from all episode NFO files:
+7. Force update MPAA ratings from tvshow.nfo to all episode NFO files (updates even if they already match):
+
+```bash
+python src/anime_metadata_updater.py --folder "D:\anime\collection" --sync-mpaa --force-update
+```
+
+8. Remove MPAA ratings from all episode NFO files:
 
 ```bash
 python src/anime_metadata_updater.py --folder "D:\anime\collection" --remove-mpaa

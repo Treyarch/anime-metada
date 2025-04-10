@@ -215,7 +215,8 @@ class AnimeMetadataUpdater:
                 mpaa_elem = ET.SubElement(root, 'mpaa')
                 
             # Update the MPAA value
-            if mpaa_elem.text != mpaa_value:
+            force_update = self.options.get('force_update', False)
+            if mpaa_elem.text != mpaa_value or force_update:
                 mpaa_elem.text = mpaa_value
                 
                 # Convert tree to string without the XML declaration (we'll add the exact one we want later)
@@ -224,7 +225,8 @@ class AnimeMetadataUpdater:
                 # Write the file preserving encoding
                 write_xml_file(episode_path, xml_string, has_bom)
                 
-                logger.info(f"Updated MPAA rating to '{mpaa_value}' in {episode_path}")
+                log_message = "Updated MPAA rating" if mpaa_elem.text != mpaa_value else "Force-updated MPAA rating"
+                logger.info(f"{log_message} to '{mpaa_value}' in {episode_path}")
                 self.stats["episodes_updated"] += 1
             else:
                 logger.info(f"MPAA already set to '{mpaa_value}' in {episode_path}")
@@ -546,7 +548,7 @@ def parse_arguments():
     parser.add_argument("--translate-only", action="store_true", help="Only translate descriptions, skip rating updates")
     parser.add_argument("--rating-only", action="store_true", help="Only update ratings, skip translations")
     parser.add_argument("--skip-translate", action="store_true", help="Skip translation of descriptions")
-    parser.add_argument("--force-update", action="store_true", help="Force update of ratings even if they already exist")
+    parser.add_argument("--force-update", action="store_true", help="Force update of ratings and MPAA values even if they already exist")
     parser.add_argument("--sync-mpaa", action="store_true", help="Sync MPAA rating from tvshow.nfo to all episode NFO files")
     parser.add_argument("--remove-mpaa", action="store_true", help="Remove MPAA rating from all episode NFO files")
     
