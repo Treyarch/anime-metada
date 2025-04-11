@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 import codecs
 import requests
 from anthropic import Anthropic
+from dotenv import load_dotenv
 
 # Set up logging
 logging.basicConfig(
@@ -81,7 +82,11 @@ class AnimeMetadataUpdater:
     def __init__(self, folder_path, claude_api_key=None, options=None):
         """Initialize the updater with folder path and API keys."""
         self.folder_path = os.path.abspath(folder_path)
-        self.claude_client = Anthropic(api_key=claude_api_key) if claude_api_key else None
+        # Initialize Claude client without proxy settings
+        if claude_api_key:
+            self.claude_client = Anthropic(api_key=claude_api_key)
+        else:
+            self.claude_client = None
         self.options = options or {}
         self.jikan_base_url = "https://api.jikan.moe/v4/anime"
         
@@ -473,8 +478,8 @@ class AnimeMetadataUpdater:
             
             # Translate plot if it exists
             if plot_elem is not None and plot_elem.text:
-                english_plot = plot_elem.text.strip()
-                french_plot = self._translate_text(english_plot)
+                the_plot = plot_elem.text.strip()
+                french_plot = self._translate_text(the_plot)
                 if french_plot:
                     plot_elem.text = french_plot
                     changes_made = True
@@ -482,8 +487,8 @@ class AnimeMetadataUpdater:
             
             # Translate outline if it exists
             if outline_elem is not None and outline_elem.text:
-                english_outline = outline_elem.text.strip()
-                french_outline = self._translate_text(english_outline)
+                the_outline = outline_elem.text.strip()
+                french_outline = self._translate_text(the_outline)
                 if french_outline:
                     outline_elem.text = french_outline
                     changes_made = True
@@ -505,12 +510,12 @@ class AnimeMetadataUpdater:
             time.sleep(0.5)
             
             response = self.claude_client.messages.create(
-                model="claude-3-opus-20240229",
+                model="claude-3-5-haiku-latest",
                 max_tokens=1024,
                 messages=[
                     {
                         "role": "user",
-                        "content": f"Translate the following text from English to French. Preserve any formatting and special characters:\n\n{text}"
+                        "content": f"Translate the following text from English or Japanese to French. Preserve any formatting and special characters. I just want a straight translation, no extra formatting text.:\n\n{text}"
                     }
                 ]
             )
@@ -539,24 +544,66 @@ class AnimeMetadataUpdater:
         logger.info("=" * 50)
 
 
+def load_environment():
+    """Load environment variables from .env file."""
+    # Load environment variables
+    load_dotenv()
+    
+    # Get environment variables
+    env_folder = os.getenv('ANIME_FOLDER')
+    env_claude_api_key = os.getenv('CLAUDE_API_KEY')
+    
+    # Parse boolean options from environment
+    env_skip_translate = os.getenv('SKIP_TRANSLATE', '').lower() == 'true'
+    env_rating_only = os.getenv('RATING_ONLY', '').lower() == 'true'
+    env_sync_mpaa = os.getenv('SYNC_MPAA', '').lower() == 'true'
+    env_force_update = os.getenv('FORCE_UPDATE', '').lower() == 'true'
+    env_remove_mpaa = os.getenv('REMOVE_MPAA', '').lower() == 'true'
+    
+    return {
+        'folder': env_folder,
+        'claude_api_key': env_claude_api_key,
+        'skip_translate': env_skip_translate,
+        'rating_only': env_rating_only,
+        'sync_mpaa': env_sync_mpaa,
+        'force_update': env_force_update,
+        'remove_mpaa': env_remove_mpaa
+    }
+
+
 def parse_arguments():
-    """Parse command line arguments."""
+    """Parse command line arguments with defaults from environment variables."""
+    # Load environment variables first
+    env_vars = load_environment()
+    
     parser = argparse.ArgumentParser(description="Anime Metadata Updater")
     
-    parser.add_argument("--folder", required=True, help="Path to the anime collection folder")
-    parser.add_argument("--claude-api-key", help="API key for Claude (required for translation)")
-    parser.add_argument("--translate-only", action="store_true", help="Only translate descriptions, skip rating updates")
-    parser.add_argument("--rating-only", action="store_true", help="Only update ratings, skip translations")
-    parser.add_argument("--skip-translate", action="store_true", help="Skip translation of descriptions")
-    parser.add_argument("--force-update", action="store_true", help="Force update of ratings and MPAA values even if they already exist")
-    parser.add_argument("--sync-mpaa", action="store_true", help="Sync MPAA rating from tvshow.nfo to all episode NFO files")
-    parser.add_argument("--remove-mpaa", action="store_true", help="Remove MPAA rating from all episode NFO files")
+    parser.add_argument("--folder", default=env_vars['folder'],
+                        help="Path to the anime collection folder")
+    parser.add_argument("--claude-api-key", default=env_vars['claude_api_key'],
+                        help="API key for Claude (required for translation)")
+    parser.add_argument("--translate-only", action="store_true",
+                        help="Only translate descriptions, skip rating updates")
+    parser.add_argument("--rating-only", action="store_true", default=env_vars['rating_only'],
+                        help="Only update ratings, skip translations")
+    parser.add_argument("--skip-translate", action="store_true", default=env_vars['skip_translate'],
+                        help="Skip translation of descriptions")
+    parser.add_argument("--force-update", action="store_true", default=env_vars['force_update'],
+                        help="Force update of ratings and MPAA values even if they already exist")
+    parser.add_argument("--sync-mpaa", action="store_true", default=env_vars['sync_mpaa'],
+                        help="Sync MPAA rating from tvshow.nfo to all episode NFO files")
+    parser.add_argument("--remove-mpaa", action="store_true", default=env_vars['remove_mpaa'],
+                        help="Remove MPAA rating from all episode NFO files")
     
     args = parser.parse_args()
     
+    # Validate that folder path is provided
+    if not args.folder:
+        parser.error("No folder path provided. Use --folder argument or set ANIME_FOLDER in .env file")
+    
     # Validate that Claude API key is provided if translation is needed
     if not args.rating_only and not args.skip_translate and not args.sync_mpaa and not args.remove_mpaa and not args.claude_api_key:
-        parser.error("--claude-api-key is required unless --rating-only, --skip-translate, --sync-mpaa, or --remove-mpaa is specified")
+        parser.error("Claude API key is required for translation. Use --claude-api-key argument or set CLAUDE_API_KEY in .env file, or use --rating-only, --skip-translate options")
     
     # Validate that sync-mpaa and remove-mpaa are not used together
     if args.sync_mpaa and args.remove_mpaa:
