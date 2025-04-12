@@ -104,6 +104,7 @@ class AnimeMetadataUpdater:
             "episodes_translated": 0,
             "episode_titles_translated": 0,
             "episode_plots_translated": 0,
+            "episodes_updated": 0,  # Added this key to fix the issue
             "errors": 0
         }
         
@@ -663,6 +664,7 @@ Here's the text to translate:
         logger.info("=" * 50)
         
         if self.options.get('sync_mpaa', False) or self.options.get('remove_mpaa', False):
+            # Make sure we have "episodes_updated" in our stats when using MPAA operations
             logger.info(f"Episode NFO files updated: {self.stats['episodes_updated']}")
         else:
             logger.info(f"TV Show files processed: {self.stats['processed_files']}")
