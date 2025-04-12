@@ -100,7 +100,10 @@ class AnimeMetadataUpdater:
             "updated_ratings": 0,
             "updated_genres": 0,
             "translated_plots": 0,
-            "episodes_updated": 0,
+            "episodes_processed": 0,
+            "episodes_translated": 0,
+            "episode_titles_translated": 0,
+            "episode_plots_translated": 0,
             "errors": 0
         }
         
@@ -122,15 +125,37 @@ class AnimeMetadataUpdater:
             self._print_summary()
             return
         
-        # Normal metadata updating
+        # Check if we're only processing episode files
+        episodes_only = self.options.get('episodes_only', False)
+        if episodes_only:
+            logger.info("Processing episode files only (skipping tvshow.nfo files)")
+        
+        # Process folders
         for root, dirs, files in os.walk(self.folder_path):
-            if 'tvshow.nfo' in files:
+            # Process tvshow.nfo if not in episodes-only mode
+            if not episodes_only and 'tvshow.nfo' in files:
                 nfo_path = os.path.join(root, 'tvshow.nfo')
                 try:
                     self._process_nfo_file(nfo_path)
                 except Exception as e:
                     logger.error(f"Error processing {nfo_path}: {str(e)}")
                     self.stats["errors"] += 1
+            
+            # Check if we need to process episode files
+            if self.options.get('translate_episodes', False) or episodes_only:
+                # Get all episode NFO files in this folder
+                episode_files = [f for f in files if f.endswith('.nfo') and f != 'tvshow.nfo']
+                
+                if episode_files:
+                    logger.info(f"Found {len(episode_files)} episode NFO files in {root}")
+                    
+                    for episode_file in episode_files:
+                        episode_path = os.path.join(root, episode_file)
+                        try:
+                            self._process_episode_nfo(episode_path)
+                        except Exception as e:
+                            logger.error(f"Error processing episode {episode_path}: {str(e)}")
+                            self.stats["errors"] += 1
         
         self._print_summary()
     
@@ -509,13 +534,24 @@ class AnimeMetadataUpdater:
             # Add a short delay to respect API rate limits
             time.sleep(0.5)
             
+            # Get the model from options, with a default fallback
+            model = self.options.get('claude_model', 'claude-3-5-haiku-latest')
+            logger.debug(f"Using Claude model: {model}")
+            
             response = self.claude_client.messages.create(
-                model="claude-3-5-haiku-latest",
+                model=model,
                 max_tokens=1024,
                 messages=[
                     {
                         "role": "user",
-                        "content": f"Translate the following text from English or Japanese to French. Preserve any formatting and special characters. I just want a straight translation, no extra formatting text.:\n\n{text}"
+                        "content": f"""Translate the following text from English or Japanese to French.
+
+IMPORTANT: Respond ONLY with the direct translation without commentary, explanation, or notes. Do not include phrases like 'Here is the translation' or 'I apologize'.
+
+If the text is already in French, simply return it unchanged (no comments please).
+
+Here's the text to translate:
+{text}"""
                     }
                 ]
             )
@@ -526,6 +562,100 @@ class AnimeMetadataUpdater:
             logger.error(f"Translation error: {str(e)}")
             return None
     
+    def _process_episode_nfo(self, episode_path):
+        """
+        Process an episode NFO file to translate title and plot.
+        
+        Args:
+            episode_path: Path to the episode NFO file
+        """
+        logger.info(f"Processing episode: {episode_path}")
+        
+        try:
+            # Read the file content preserving encoding
+            xml_content, has_bom = read_xml_file(episode_path)
+            
+            # Parse the XML while preserving formatting
+            parser = ET.XMLParser(encoding='utf-8')
+            root = ET.fromstring(xml_content.encode('utf-8'), parser=parser)
+            
+            # Check if it's an episode XML format
+            if root.tag != 'episodedetails':
+                logger.warning(f"File {episode_path} is not an episode NFO, skipping")
+                return
+            
+            self.stats["episodes_processed"] += 1
+            changes_made = False
+            
+            # Translate title if it exists
+            title_elem = root.find('title')
+            if title_elem is not None and title_elem.text and title_elem.text.strip():
+                # Only translate if the title is not already in French
+                # This is a simple heuristic - you might want to improve it
+                if not self._appears_to_be_french(title_elem.text):
+                    logger.info(f"Translating episode title...")
+                    translated_title = self._translate_text(title_elem.text.strip())
+                    if translated_title and translated_title != title_elem.text:
+                        title_elem.text = translated_title
+                        changes_made = True
+                        self.stats["episode_titles_translated"] += 1
+                        logger.info(f"Translated title: {translated_title}")
+            
+            # Translate plot if it exists
+            plot_elem = root.find('plot')
+            if plot_elem is not None and plot_elem.text and plot_elem.text.strip():
+                # Only translate if the plot is not already in French
+                if not self._appears_to_be_french(plot_elem.text):
+                    logger.info(f"Translating episode plot...")
+                    translated_plot = self._translate_text(plot_elem.text.strip())
+                    if translated_plot and translated_plot != plot_elem.text:
+                        plot_elem.text = translated_plot
+                        changes_made = True
+                        self.stats["episode_plots_translated"] += 1
+                        logger.info(f"Translated plot successfully")
+            
+            # Write changes if any were made
+            if changes_made:
+                self.stats["episodes_translated"] += 1
+                
+                # Convert tree to string without the XML declaration (we'll add the exact one we want later)
+                xml_string = ET.tostring(root, encoding='utf-8', xml_declaration=False).decode('utf-8')
+                
+                # Write the file preserving encoding
+                write_xml_file(episode_path, xml_string, has_bom)
+                
+                logger.info(f"Updated episode file: {episode_path}")
+            else:
+                logger.info(f"No translation changes needed for episode: {episode_path}")
+            
+        except Exception as e:
+            logger.error(f"Error processing episode NFO {episode_path}: {str(e)}")
+            raise
+    
+    def _appears_to_be_french(self, text):
+        """
+        Simple heuristic to check if text appears to be in French already.
+        This is not foolproof but helps avoid unnecessary translations.
+        
+        Args:
+            text: Text to check
+            
+        Returns:
+            True if the text appears to be in French
+        """
+        # Simple check for common French words/patterns
+        french_indicators = [
+            ' le ', ' la ', ' les ', ' des ', ' un ', ' une ', ' du ', ' de la ', ' à ', ' est ',
+            'ç', 'é', 'è', 'ê', 'â', 'ô', 'î', 'û', 'ë', 'ï', 'ü'
+        ]
+        
+        # Check for French indicators
+        text_lower = text.lower()
+        french_indicators_found = sum(1 for indicator in french_indicators if indicator in text_lower)
+        
+        # Heuristic: if more than 2 French indicators are found, consider it French
+        return french_indicators_found > 2
+    
     def _print_summary(self):
         """Print a summary of the changes made."""
         logger.info("=" * 50)
@@ -535,10 +665,16 @@ class AnimeMetadataUpdater:
         if self.options.get('sync_mpaa', False) or self.options.get('remove_mpaa', False):
             logger.info(f"Episode NFO files updated: {self.stats['episodes_updated']}")
         else:
-            logger.info(f"Files processed: {self.stats['processed_files']}")
+            logger.info(f"TV Show files processed: {self.stats['processed_files']}")
             logger.info(f"Ratings updated: {self.stats['updated_ratings']}")
             logger.info(f"Genres updated: {self.stats['updated_genres']}")
-            logger.info(f"Descriptions translated: {self.stats['translated_plots']}")
+            logger.info(f"TV Show descriptions translated: {self.stats['translated_plots']}")
+            
+            if self.options.get('translate_episodes', False) or self.options.get('episodes_only', False):
+                logger.info(f"Episode files processed: {self.stats['episodes_processed']}")
+                logger.info(f"Episode files with translations: {self.stats['episodes_translated']}")
+                logger.info(f"Episode titles translated: {self.stats['episode_titles_translated']}")
+                logger.info(f"Episode plots translated: {self.stats['episode_plots_translated']}")
             
         logger.info(f"Errors encountered: {self.stats['errors']}")
         logger.info("=" * 50)
@@ -552,6 +688,7 @@ def load_environment():
     # Get environment variables
     env_folder = os.getenv('ANIME_FOLDER')
     env_claude_api_key = os.getenv('CLAUDE_API_KEY')
+    env_claude_model = os.getenv('CLAUDE_MODEL', 'claude-3-5-haiku-latest')  # Default model if not specified
     
     # Parse boolean options from environment
     env_skip_translate = os.getenv('SKIP_TRANSLATE', '').lower() == 'true'
@@ -559,15 +696,20 @@ def load_environment():
     env_sync_mpaa = os.getenv('SYNC_MPAA', '').lower() == 'true'
     env_force_update = os.getenv('FORCE_UPDATE', '').lower() == 'true'
     env_remove_mpaa = os.getenv('REMOVE_MPAA', '').lower() == 'true'
+    env_translate_episodes = os.getenv('TRANSLATE_EPISODES', '').lower() == 'true'
+    env_episodes_only = os.getenv('EPISODES_ONLY', '').lower() == 'true'
     
     return {
         'folder': env_folder,
         'claude_api_key': env_claude_api_key,
+        'claude_model': env_claude_model,
         'skip_translate': env_skip_translate,
         'rating_only': env_rating_only,
         'sync_mpaa': env_sync_mpaa,
         'force_update': env_force_update,
-        'remove_mpaa': env_remove_mpaa
+        'remove_mpaa': env_remove_mpaa,
+        'translate_episodes': env_translate_episodes,
+        'episodes_only': env_episodes_only
     }
 
 
@@ -582,6 +724,8 @@ def parse_arguments():
                         help="Path to the anime collection folder")
     parser.add_argument("--claude-api-key", default=env_vars['claude_api_key'],
                         help="API key for Claude (required for translation)")
+    parser.add_argument("--claude-model", default=env_vars['claude_model'],
+                        help="Claude model to use for translation (default: claude-3-haiku-20240307)")
     parser.add_argument("--translate-only", action="store_true",
                         help="Only translate descriptions, skip rating updates")
     parser.add_argument("--rating-only", action="store_true", default=env_vars['rating_only'],
@@ -594,6 +738,10 @@ def parse_arguments():
                         help="Sync MPAA rating from tvshow.nfo to all episode NFO files")
     parser.add_argument("--remove-mpaa", action="store_true", default=env_vars['remove_mpaa'],
                         help="Remove MPAA rating from all episode NFO files")
+    parser.add_argument("--translate-episodes", action="store_true", 
+                        help="Translate plot and title in episode NFO files")
+    parser.add_argument("--episodes-only", action="store_true",
+                        help="Only process episode files, skip tvshow.nfo")
     
     args = parser.parse_args()
     
@@ -602,8 +750,12 @@ def parse_arguments():
         parser.error("No folder path provided. Use --folder argument or set ANIME_FOLDER in .env file")
     
     # Validate that Claude API key is provided if translation is needed
-    if not args.rating_only and not args.skip_translate and not args.sync_mpaa and not args.remove_mpaa and not args.claude_api_key:
-        parser.error("Claude API key is required for translation. Use --claude-api-key argument or set CLAUDE_API_KEY in .env file, or use --rating-only, --skip-translate options")
+    translations_needed = (not args.rating_only and not args.skip_translate and 
+                          not args.sync_mpaa and not args.remove_mpaa) or args.translate_episodes
+    
+    if translations_needed and not args.claude_api_key:
+        parser.error("Claude API key is required for translation. Use --claude-api-key argument or set CLAUDE_API_KEY in .env file, "
+                     "or use --rating-only, --skip-translate options")
     
     # Validate that sync-mpaa and remove-mpaa are not used together
     if args.sync_mpaa and args.remove_mpaa:
@@ -623,7 +775,10 @@ def main():
             "skip_translate": args.skip_translate,
             "force_update": args.force_update,
             "sync_mpaa": args.sync_mpaa,
-            "remove_mpaa": args.remove_mpaa
+            "remove_mpaa": args.remove_mpaa,
+            "translate_episodes": args.translate_episodes,
+            "episodes_only": args.episodes_only,
+            "claude_model": args.claude_model
         }
         
         updater = AnimeMetadataUpdater(
