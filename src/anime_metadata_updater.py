@@ -79,7 +79,7 @@ def write_xml_file(file_path, xml_string, has_bom=False):
 class AnimeMetadataUpdater:
     """Main class for updating anime metadata."""
     
-    def __init__(self, folder_path, claude_api_key=None, options=None):
+    def __init__(self, folder_path, claude_api_key=None, youtube_api_key=None, options=None):
         """Initialize the updater with folder path and API keys."""
         self.folder_path = os.path.abspath(folder_path)
         # Initialize Claude client without proxy settings
@@ -87,6 +87,10 @@ class AnimeMetadataUpdater:
             self.claude_client = Anthropic(api_key=claude_api_key)
         else:
             self.claude_client = None
+        
+        # Store the YouTube API key
+        self.youtube_api_key = youtube_api_key
+        
         self.options = options or {}
         self.jikan_base_url = "https://api.jikan.moe/v4/anime"
         
@@ -135,6 +139,7 @@ class AnimeMetadataUpdater:
         if self.is_default_mode:
             logger.info("Running in default mode - processing all content types")
         logger.info(f"Translation {'enabled' if self.claude_client else 'disabled'}")
+        logger.info(f"YouTube API {'enabled' if self.youtube_api_key else 'disabled - trailer search will fall back to Jikan API'}")
     
     def run(self):
         """Main method to run the updater."""
@@ -477,6 +482,7 @@ class AnimeMetadataUpdater:
             try:
                 trailer_data = anime_data.get('trailer', {})
                 youtube_id = None
+                trailer_source = "Jikan API"
                 
                 # Try to get the youtube_id from the trailer data
                 if trailer_data and isinstance(trailer_data, dict):
@@ -497,6 +503,13 @@ class AnimeMetadataUpdater:
                             youtube_match = re.search(r'(?:youtube\.com\/watch\?v=|youtu.be\/)([a-zA-Z0-9_-]+)', url)
                             if youtube_match:
                                 youtube_id = youtube_match.group(1)
+                
+                # If no trailer found in API, try YouTube search as fallback
+                if not youtube_id:
+                    logger.info(f"No trailer found in Jikan API for {title}, searching YouTube...")
+                    youtube_id = self._search_youtube_trailer(title)
+                    trailer_source = "YouTube search"
+                
             except Exception as e:
                 logger.error(f"Error extracting trailer for {title}: {str(e)}")
                 youtube_id = None
@@ -520,7 +533,7 @@ class AnimeMetadataUpdater:
                     trailer_updated = True
                 
                 if trailer_updated:
-                    logger.info(f"Updated trailer for {title}: {trailer_url}")
+                    logger.info(f"Updated trailer for {title} from {trailer_source}: {trailer_url}")
                     self.stats["updated_trailers"] += 1
                     changes_made = True
                 else:
@@ -536,6 +549,93 @@ class AnimeMetadataUpdater:
             logger.error(f"Error updating metadata for {title}: {str(e)}")
             logger.debug(f"Detailed traceback for {title}: {error_details}")
             return False
+    
+    def _search_youtube_trailer(self, title):
+        """
+        Search YouTube for an official trailer of the anime using YouTube Data API.
+        Uses the API to get the top results ordered by view count.
+        
+        Args:
+            title: The anime title to search for
+            
+        Returns:
+            A YouTube video ID if found, None otherwise
+        """
+        if not self.youtube_api_key:
+            logger.warning("No YouTube API key provided, skipping trailer search")
+            return None
+            
+        try:
+            # Clean and prepare the search query
+            search_query = f"{title} official trailer anime"
+            
+            # Construct the YouTube Data API URL
+            api_url = "https://www.googleapis.com/youtube/v3/search"
+            
+            # Set up the API parameters as requested
+            params = {
+                'part': 'snippet',
+                'maxResults': 5,
+                'q': search_query,
+                'type': 'video',  # Only get videos, not playlists or channels
+                'order': 'viewCount',  # Sort by view count
+                'key': self.youtube_api_key
+            }
+            
+            # Make the API request
+            logger.info(f"Searching YouTube API for '{title}' trailer")
+            response = requests.get(api_url, params=params, timeout=10)
+            
+            # Check for API errors
+            if response.status_code != 200:
+                logger.warning(f"YouTube API error: {response.status_code} - {response.text}")
+                return None
+                
+            # Parse the response
+            data = response.json()
+            
+            # Check if we got any results
+            if not data.get('items'):
+                logger.warning(f"No YouTube videos found for {title}")
+                return None
+                
+            # Get the first result (highest view count)
+            top_video = data['items'][0]
+            video_id = top_video['id']['videoId']
+            video_title = top_video['snippet']['title']
+            
+            logger.info(f"Found YouTube trailer via API for {title}: {video_id} - '{video_title}'")
+            return video_id
+            
+        except Exception as e:
+            logger.error(f"Error searching YouTube API for {title}: {str(e)}")
+            return None
+    
+    def _apply_jikan_rate_limits(self):
+        """Apply rate limiting for Jikan API based on recent requests."""
+        current_time = time.time()
+        
+        # Remove requests older than 1 minute
+        self.jikan_requests = [t for t in self.jikan_requests if current_time - t < 60]
+        
+        # Check if we're over the per-minute limit
+        if len(self.jikan_requests) >= self.jikan_minute_limit:
+            # Calculate how long to wait
+            oldest = min(self.jikan_requests)
+            wait_time = 60 - (current_time - oldest) + 0.1  # Add a small buffer
+            logger.info(f"Approaching per-minute rate limit, waiting {wait_time:.2f} seconds")
+            time.sleep(wait_time)
+            # Clear old requests after waiting
+            self.jikan_requests = []
+            return
+        
+        # Check if we've made requests in the last 1/3 second (to maintain 3 per second)
+        recent_requests = [t for t in self.jikan_requests if current_time - t < (1.0 / self.jikan_second_limit)]
+        if recent_requests:
+            # Calculate sleep time needed to maintain rate
+            wait_time = (1.0 / self.jikan_second_limit) - (current_time - max(recent_requests))
+            if wait_time > 0:
+                time.sleep(wait_time)
     
     def _make_jikan_request(self, params):
         """Make a request to the Jikan API with rate limiting.
@@ -573,32 +673,6 @@ class AnimeMetadataUpdater:
         except requests.exceptions.RequestException as e:
             logger.error(f"Request error: {str(e)}")
             return None
-    
-    def _apply_jikan_rate_limits(self):
-        """Apply rate limiting for Jikan API based on recent requests."""
-        current_time = time.time()
-        
-        # Remove requests older than 1 minute
-        self.jikan_requests = [t for t in self.jikan_requests if current_time - t < 60]
-        
-        # Check if we're over the per-minute limit
-        if len(self.jikan_requests) >= self.jikan_minute_limit:
-            # Calculate how long to wait
-            oldest = min(self.jikan_requests)
-            wait_time = 60 - (current_time - oldest) + 0.1  # Add a small buffer
-            logger.info(f"Approaching per-minute rate limit, waiting {wait_time:.2f} seconds")
-            time.sleep(wait_time)
-            # Clear old requests after waiting
-            self.jikan_requests = []
-            return
-        
-        # Check if we've made requests in the last 1/3 second (to maintain 3 per second)
-        recent_requests = [t for t in self.jikan_requests if current_time - t < (1.0 / self.jikan_second_limit)]
-        if recent_requests:
-            # Calculate sleep time needed to maintain rate
-            wait_time = (1.0 / self.jikan_second_limit) - (current_time - max(recent_requests))
-            if wait_time > 0:
-                time.sleep(wait_time)
     
     def _translate_descriptions(self, root):
         """Translate plot and outline to French using Claude API."""
@@ -831,6 +905,7 @@ def load_environment():
     # Get environment variables
     env_folder = os.getenv('ANIME_FOLDER')
     env_claude_api_key = os.getenv('CLAUDE_API_KEY')
+    env_youtube_api_key = os.getenv('YOUTUBE_API_KEY')
     env_claude_model = os.getenv('CLAUDE_MODEL', 'claude-3-5-haiku-latest')  # Default model if not specified
     
     # Parse boolean options from environment
@@ -845,6 +920,7 @@ def load_environment():
     return {
         'folder': env_folder,
         'claude_api_key': env_claude_api_key,
+        'youtube_api_key': env_youtube_api_key,
         'claude_model': env_claude_model,
         'skip_translate': env_skip_translate,
         'rating_only': env_rating_only,
@@ -867,6 +943,8 @@ def parse_arguments():
                         help="Path to the anime collection folder")
     parser.add_argument("--claude-api-key", default=env_vars['claude_api_key'],
                         help="API key for Claude (required for translation)")
+    parser.add_argument("--youtube-api-key", default=env_vars['youtube_api_key'],
+                        help="API key for YouTube Data API (required for trailer search)")
     parser.add_argument("--claude-model", default=env_vars['claude_model'],
                         help="Claude model to use for translation (default: claude-3-5-haiku-latest)")
     parser.add_argument("--translate-only", action="store_true",
@@ -927,6 +1005,7 @@ def main():
         updater = AnimeMetadataUpdater(
             folder_path=args.folder,
             claude_api_key=args.claude_api_key,
+            youtube_api_key=args.youtube_api_key,
             options=options
         )
         

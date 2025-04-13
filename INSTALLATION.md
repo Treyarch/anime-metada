@@ -12,12 +12,15 @@ pip install -r requirements.txt
 
 3. Get your Claude API key from Anthropic. You'll need this to use the translation functionality.
 
-4. Set up your environment:
+4. Get a YouTube Data API key from Google Cloud Console. This is required for finding trailers when not available in Jikan API.
+
+5. Set up your environment:
    - Copy the `.env.template` file and rename it to `.env`
-   - Edit the `.env` file and set your anime folder path and Claude API key:
+   - Edit the `.env` file and set your anime folder path, Claude API key, and YouTube API key:
      ```
      ANIME_FOLDER=D:/path/to/your/anime/collection
      CLAUDE_API_KEY=your_claude_api_key
+     YOUTUBE_API_KEY=your_youtube_api_key
      ```
    - Optionally, you can enable default settings in the `.env` file:
      ```
@@ -42,6 +45,7 @@ With the `.env` file set up, you don't need to specify command-line arguments un
 
 - `--folder`: Path to your anime collection folder (overrides ANIME_FOLDER in .env)
 - `--claude-api-key`: Your API key for Claude (overrides CLAUDE_API_KEY in .env)
+- `--youtube-api-key`: Your API key for YouTube Data API (overrides YOUTUBE_API_KEY in .env)
 - `--translate-only`: Only translate descriptions, skip rating updates
 - `--rating-only`: Only update ratings, skip translations
 - `--skip-translate`: Skip translation of descriptions entirely
@@ -122,6 +126,7 @@ The following environment variables can be set in the `.env` file:
 
 - `ANIME_FOLDER`: Path to your anime collection folder
 - `CLAUDE_API_KEY`: Your Claude API key
+- `YOUTUBE_API_KEY`: Your YouTube Data API key
 - `SKIP_TRANSLATE`: Set to "true" to skip translation
 - `RATING_ONLY`: Set to "true" to only update ratings
 - `SYNC_MPAA`: Set to "true" to sync MPAA ratings

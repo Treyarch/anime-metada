@@ -7,6 +7,7 @@ This script processes a folder of anime series, updates ratings and genres from 
 - Required packages: requests, xml.etree.ElementTree, anthropic
 - API access to Jikan (https://jikan.moe/) - no authentication required
 - Claude API key for translation (optional if only updating metadata)
+- YouTube Data API key for trailer search (optional if using Jikan API trailers only)
 
 ## Script Functionality
 
@@ -36,6 +37,9 @@ This script processes a folder of anime series, updates ratings and genres from 
 - Replaces all <genre> tags with genres from the Jikan API
 - Updates <tag> elements with theme data from the Jikan API
 - Updates <trailer> element with YouTube trailer links in Kodi-compatible format
+- Uses YouTube Data API to find official trailers when not available in Jikan API
+- Retrieves the most viewed trailers using the API's viewCount sorting
+- Provides clean and reliable trailer links without relying on web scraping
 - Handles cases where anime titles might not match exactly
 
 
