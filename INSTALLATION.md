@@ -53,13 +53,13 @@ Command-line options take precedence over the settings in the `.env` file.
 
 ### Examples
 
-1. Update both ratings and genres, and translate descriptions:
+1. Update ratings, genres, tags, and translate descriptions:
 
 ```bash
 python src/anime_metadata_updater.py
 ```
 
-2. Only update ratings and genres (no translation):
+2. Only update ratings, genres, and tags (no translation):
 
 ```bash
 python src/anime_metadata_updater.py --rating-only

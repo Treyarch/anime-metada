@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <tvshow>
     <title>Attack on Titan</title>
     <originaltitle>進撃の巨人</originaltitle>
@@ -8,12 +8,6 @@
     <episode>25</episode>
     <plot>Several hundred years ago, humans were nearly exterminated by giants. Giants are typically several stories tall, seem to have no intelligence, devour human beings and, worst of all, seem to do it for the pleasure rather than as a food source. A small percentage of humanity survived by building a city protected by extremely high walls, even taller than the biggest of giants. Flash forward to the present and the city has not seen a giant in over 100 years. Teenage boy Eren and his foster sister Mikasa witness something horrific as the city walls are destroyed by a super giant that appears out of thin air. As the smaller giants flood the city, the two kids watch in horror as their mother is eaten alive. Eren vows that he will murder every single giant and take revenge for all of mankind.</plot>
     <outline>In a world where giant humanoids prey on humans, Eren Yeager joins the scouting legion to get revenge on the monsters who killed everyone in his town.</outline>
-    <genre>Animation</genre>
-    <genre>Action</genre>
-    <genre>Adventure</genre>
-    <genre>Drama</genre>
-    <genre>Fantasy</genre>
-    <genre>Horror</genre>
     <premiered>2013-04-07</premiered>
     <status>Ended</status>
     <studio>Wit Studio</studio>
@@ -26,4 +20,4 @@
         <name>Yui Ishikawa</name>
         <role>Mikasa Ackerman (voice)</role>
     </actor>
-</tvshow>
+<rating>8.56</rating><genre>Action</genre><genre>Award Winning</genre><genre>Drama</genre><genre>Suspense</genre><tag>Gore</tag><tag>Military</tag><tag>Survival</tag></tvshow>

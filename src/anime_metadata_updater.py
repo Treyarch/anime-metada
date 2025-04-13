@@ -90,6 +90,22 @@ class AnimeMetadataUpdater:
         self.options = options or {}
         self.jikan_base_url = "https://api.jikan.moe/v4/anime"
         
+        # Check if no specific processing flags were set - "default mode"
+        # In default mode, we'll process everything
+        self.is_default_mode = (
+            not self.options.get('translate_only', False) and
+            not self.options.get('rating_only', False) and
+            not self.options.get('skip_translate', False) and
+            not self.options.get('sync_mpaa', False) and
+            not self.options.get('remove_mpaa', False) and
+            not self.options.get('translate_episodes', False) and
+            not self.options.get('episodes_only', False)
+        )
+        
+        # If we're in default mode, enable episode processing
+        if self.is_default_mode:
+            self.options['translate_episodes'] = True
+        
         # Rate limiting for Jikan API
         self.jikan_requests = []  # Timestamps of recent requests
         self.jikan_minute_limit = 60  # Max 60 requests per minute
@@ -99,12 +115,13 @@ class AnimeMetadataUpdater:
             "processed_files": 0,
             "updated_ratings": 0,
             "updated_genres": 0,
+            "updated_tags": 0,
             "translated_plots": 0,
             "episodes_processed": 0,
             "episodes_translated": 0,
             "episode_titles_translated": 0,
             "episode_plots_translated": 0,
-            "episodes_updated": 0,  # Added this key to fix the issue
+            "episodes_updated": 0,
             "errors": 0
         }
         
@@ -114,6 +131,8 @@ class AnimeMetadataUpdater:
             
         logger.info(f"Initializing with folder: {self.folder_path}")
         logger.info(f"Options: {self.options}")
+        if self.is_default_mode:
+            logger.info("Running in default mode - processing all content types")
         logger.info(f"Translation {'enabled' if self.claude_client else 'disabled'}")
     
     def run(self):
@@ -143,7 +162,8 @@ class AnimeMetadataUpdater:
                     self.stats["errors"] += 1
             
             # Check if we need to process episode files
-            if self.options.get('translate_episodes', False) or episodes_only:
+            # Added default mode processing for episode files
+            if self.options.get('translate_episodes', False) or episodes_only or self.is_default_mode:
                 # Get all episode NFO files in this folder
                 episode_files = [f for f in files if f.endswith('.nfo') and f != 'tvshow.nfo']
                 
@@ -368,7 +388,7 @@ class AnimeMetadataUpdater:
             self.stats["errors"] += 1
     
     def _update_rating(self, root, title):
-        """Update the anime rating and genres using Jikan API."""
+        """Update the anime rating, genres, and tags using Jikan API."""
         try:
             # Check if we already have a rating
             rating_elem = root.find('rating')
@@ -376,7 +396,7 @@ class AnimeMetadataUpdater:
             
             force_update = self.options.get('force_update', False)
             if has_rating and not force_update:
-                logger.info(f"Rating already exists for {title}, checking genres")
+                logger.info(f"Rating already exists for {title}, checking genres and themes")
             
             # Search for the anime using Jikan API
             params = {'q': title, 'limit': 1}
@@ -420,6 +440,34 @@ class AnimeMetadataUpdater:
                 changes_made = True
             else:
                 logger.warning(f"No genres available for anime: {title}")
+            
+            # Get themes from API
+            themes_data = anime_data.get('themes', [])
+            if themes_data:
+                # Get existing tags to compare
+                existing_tags = {tag_elem.text for tag_elem in root.findall('tag') if tag_elem.text}
+                theme_names = {t.get('name') for t in themes_data if t.get('name')}
+                
+                # Only proceed if there are differences or force update is enabled
+                if existing_tags != theme_names or force_update:
+                    # Remove existing tag elements
+                    for tag_elem in root.findall('tag'):
+                        root.remove(tag_elem)
+                    
+                    # Add new tag elements for themes
+                    for theme_obj in themes_data:
+                        theme_name = theme_obj.get('name')
+                        if theme_name:
+                            tag_elem = ET.SubElement(root, 'tag')
+                            tag_elem.text = theme_name
+                    
+                    logger.info(f"Updated tags for {title}: {[t.get('name') for t in themes_data]}")
+                    self.stats["updated_tags"] += 1
+                    changes_made = True
+                else:
+                    logger.info(f"Tags already up to date for {title}")
+            else:
+                logger.info(f"No theme data available for anime: {title}")
             
             return changes_made
             
@@ -505,20 +553,26 @@ class AnimeMetadataUpdater:
             # Translate plot if it exists
             if plot_elem is not None and plot_elem.text:
                 the_plot = plot_elem.text.strip()
-                french_plot = self._translate_text(the_plot)
-                if french_plot:
-                    plot_elem.text = french_plot
-                    changes_made = True
-                    logger.info("Translated plot successfully")
+                if not self._appears_to_be_french(the_plot):
+                    french_plot = self._translate_text(the_plot)
+                    if french_plot:
+                        plot_elem.text = french_plot
+                        changes_made = True
+                        logger.info("Translated plot successfully")
+                else:
+                    logger.info("Plot already appears to be in French, skipping translation")
             
             # Translate outline if it exists
             if outline_elem is not None and outline_elem.text:
                 the_outline = outline_elem.text.strip()
-                french_outline = self._translate_text(the_outline)
-                if french_outline:
-                    outline_elem.text = french_outline
-                    changes_made = True
-                    logger.info("Translated outline successfully")
+                if not self._appears_to_be_french(the_outline):
+                    french_outline = self._translate_text(the_outline)
+                    if french_outline:
+                        outline_elem.text = french_outline
+                        changes_made = True
+                        logger.info("Translated outline successfully")
+                else:
+                    logger.info("Outline already appears to be in French, skipping translation")
             
             return changes_made
             
@@ -588,32 +642,56 @@ Here's the text to translate:
             self.stats["episodes_processed"] += 1
             changes_made = False
             
-            # Translate title if it exists
-            title_elem = root.find('title')
-            if title_elem is not None and title_elem.text and title_elem.text.strip():
-                # Only translate if the title is not already in French
-                # This is a simple heuristic - you might want to improve it
-                if not self._appears_to_be_french(title_elem.text):
-                    logger.info(f"Translating episode title...")
-                    translated_title = self._translate_text(title_elem.text.strip())
-                    if translated_title and translated_title != title_elem.text:
-                        title_elem.text = translated_title
-                        changes_made = True
-                        self.stats["episode_titles_translated"] += 1
-                        logger.info(f"Translated title: {translated_title}")
+            # Get MPAA from show if in default mode
+            if self.is_default_mode:
+                # Try to find parent tvshow.nfo
+                episode_dir = os.path.dirname(episode_path)
+                tvshow_path = os.path.join(episode_dir, 'tvshow.nfo')
+                
+                if os.path.exists(tvshow_path):
+                    mpaa_value = self._get_mpaa_from_tvshow(tvshow_path)
+                    if mpaa_value:
+                        # Check if MPAA tag already exists
+                        mpaa_elem = root.find('mpaa')
+                        if mpaa_elem is None:
+                            # Create new MPAA element
+                            mpaa_elem = ET.SubElement(root, 'mpaa')
+                            mpaa_elem.text = mpaa_value
+                            changes_made = True
+                            logger.info(f"Added MPAA rating '{mpaa_value}' to episode from tvshow.nfo")
+                        elif mpaa_elem.text != mpaa_value:
+                            mpaa_elem.text = mpaa_value
+                            changes_made = True
+                            logger.info(f"Updated MPAA rating to '{mpaa_value}' in episode from tvshow.nfo")
             
-            # Translate plot if it exists
-            plot_elem = root.find('plot')
-            if plot_elem is not None and plot_elem.text and plot_elem.text.strip():
-                # Only translate if the plot is not already in French
-                if not self._appears_to_be_french(plot_elem.text):
-                    logger.info(f"Translating episode plot...")
-                    translated_plot = self._translate_text(plot_elem.text.strip())
-                    if translated_plot and translated_plot != plot_elem.text:
-                        plot_elem.text = translated_plot
-                        changes_made = True
-                        self.stats["episode_plots_translated"] += 1
-                        logger.info(f"Translated plot successfully")
+            # Translate title if it exists (only when translation is enabled)
+            should_translate = not self.options.get('skip_translate', False) and not self.options.get('rating_only', False) and self.claude_client is not None
+            
+            if should_translate:
+                title_elem = root.find('title')
+                if title_elem is not None and title_elem.text and title_elem.text.strip():
+                    # Only translate if the title is not already in French
+                    if not self._appears_to_be_french(title_elem.text):
+                        logger.info(f"Translating episode title...")
+                        translated_title = self._translate_text(title_elem.text.strip())
+                        if translated_title and translated_title != title_elem.text:
+                            title_elem.text = translated_title
+                            changes_made = True
+                            self.stats["episode_titles_translated"] += 1
+                            logger.info(f"Translated title: {translated_title}")
+                
+                # Translate plot if it exists
+                plot_elem = root.find('plot')
+                if plot_elem is not None and plot_elem.text and plot_elem.text.strip():
+                    # Only translate if the plot is not already in French
+                    if not self._appears_to_be_french(plot_elem.text):
+                        logger.info(f"Translating episode plot...")
+                        translated_plot = self._translate_text(plot_elem.text.strip())
+                        if translated_plot and translated_plot != plot_elem.text:
+                            plot_elem.text = translated_plot
+                            changes_made = True
+                            self.stats["episode_plots_translated"] += 1
+                            logger.info(f"Translated plot successfully")
             
             # Write changes if any were made
             if changes_made:
@@ -627,7 +705,7 @@ Here's the text to translate:
                 
                 logger.info(f"Updated episode file: {episode_path}")
             else:
-                logger.info(f"No translation changes needed for episode: {episode_path}")
+                logger.info(f"No changes needed for episode: {episode_path}")
             
         except Exception as e:
             logger.error(f"Error processing episode NFO {episode_path}: {str(e)}")
@@ -664,15 +742,15 @@ Here's the text to translate:
         logger.info("=" * 50)
         
         if self.options.get('sync_mpaa', False) or self.options.get('remove_mpaa', False):
-            # Make sure we have "episodes_updated" in our stats when using MPAA operations
             logger.info(f"Episode NFO files updated: {self.stats['episodes_updated']}")
         else:
             logger.info(f"TV Show files processed: {self.stats['processed_files']}")
             logger.info(f"Ratings updated: {self.stats['updated_ratings']}")
             logger.info(f"Genres updated: {self.stats['updated_genres']}")
+            logger.info(f"Tags updated: {self.stats['updated_tags']}")
             logger.info(f"TV Show descriptions translated: {self.stats['translated_plots']}")
             
-            if self.options.get('translate_episodes', False) or self.options.get('episodes_only', False):
+            if self.options.get('translate_episodes', False) or self.options.get('episodes_only', False) or self.is_default_mode:
                 logger.info(f"Episode files processed: {self.stats['episodes_processed']}")
                 logger.info(f"Episode files with translations: {self.stats['episodes_translated']}")
                 logger.info(f"Episode titles translated: {self.stats['episode_titles_translated']}")
@@ -727,7 +805,7 @@ def parse_arguments():
     parser.add_argument("--claude-api-key", default=env_vars['claude_api_key'],
                         help="API key for Claude (required for translation)")
     parser.add_argument("--claude-model", default=env_vars['claude_model'],
-                        help="Claude model to use for translation (default: claude-3-haiku-20240307)")
+                        help="Claude model to use for translation (default: claude-3-5-haiku-latest)")
     parser.add_argument("--translate-only", action="store_true",
                         help="Only translate descriptions, skip rating updates")
     parser.add_argument("--rating-only", action="store_true", default=env_vars['rating_only'],
@@ -740,9 +818,9 @@ def parse_arguments():
                         help="Sync MPAA rating from tvshow.nfo to all episode NFO files")
     parser.add_argument("--remove-mpaa", action="store_true", default=env_vars['remove_mpaa'],
                         help="Remove MPAA rating from all episode NFO files")
-    parser.add_argument("--translate-episodes", action="store_true", 
+    parser.add_argument("--translate-episodes", action="store_true", default=env_vars['translate_episodes'],
                         help="Translate plot and title in episode NFO files")
-    parser.add_argument("--episodes-only", action="store_true",
+    parser.add_argument("--episodes-only", action="store_true", default=env_vars['episodes_only'],
                         help="Only process episode files, skip tvshow.nfo")
     
     args = parser.parse_args()
