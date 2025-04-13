@@ -116,6 +116,7 @@ class AnimeMetadataUpdater:
             "updated_ratings": 0,
             "updated_genres": 0,
             "updated_tags": 0,
+            "updated_trailers": 0,
             "translated_plots": 0,
             "episodes_processed": 0,
             "episodes_translated": 0,
@@ -399,7 +400,10 @@ class AnimeMetadataUpdater:
                 logger.info(f"Rating already exists for {title}, checking genres and themes")
             
             # Search for the anime using Jikan API
-            params = {'q': title, 'limit': 1}
+            # Clean title for API query - handle special characters like in "3X3 Eyes"
+            clean_title = title.replace(':', ' ').replace('×', 'x').strip()
+            params = {'q': clean_title, 'limit': 1}
+            logger.debug(f"Searching API with cleaned title: '{clean_title}' (original: '{title}')")
             response = self._make_jikan_request(params)
             
             if not response or not response.get('data') or len(response['data']) == 0:
@@ -469,10 +473,68 @@ class AnimeMetadataUpdater:
             else:
                 logger.info(f"No theme data available for anime: {title}")
             
+            # Get trailer information from API
+            try:
+                trailer_data = anime_data.get('trailer', {})
+                youtube_id = None
+                
+                # Try to get the youtube_id from the trailer data
+                if trailer_data and isinstance(trailer_data, dict):
+                    # First try the direct youtube_id field
+                    youtube_id = trailer_data.get('youtube_id')
+                    
+                    # If not available, try to extract from embed_url or url
+                    if not youtube_id:
+                        embed_url = trailer_data.get('embed_url', '')
+                        if embed_url and isinstance(embed_url, str):
+                            youtube_match = re.search(r'(?:youtube\.com\/embed\/|youtu.be\/)([a-zA-Z0-9_-]+)', embed_url)
+                            if youtube_match:
+                                youtube_id = youtube_match.group(1)
+                    
+                    if not youtube_id:
+                        url = trailer_data.get('url', '')
+                        if url and isinstance(url, str):
+                            youtube_match = re.search(r'(?:youtube\.com\/watch\?v=|youtu.be\/)([a-zA-Z0-9_-]+)', url)
+                            if youtube_match:
+                                youtube_id = youtube_match.group(1)
+            except Exception as e:
+                logger.error(f"Error extracting trailer for {title}: {str(e)}")
+                youtube_id = None
+            
+            if youtube_id:
+                # Format the trailer URL according to requirements
+                trailer_url = f"plugin://plugin.video.youtube/play/?video_id={youtube_id}"
+                
+                # Get existing trailer element
+                trailer_elem = root.find('trailer')
+                trailer_updated = False
+                
+                if trailer_elem is None:
+                    # Create new trailer element
+                    trailer_elem = ET.SubElement(root, 'trailer')
+                    trailer_elem.text = trailer_url
+                    trailer_updated = True
+                elif trailer_elem.text != trailer_url or force_update:
+                    # Update existing trailer element
+                    trailer_elem.text = trailer_url
+                    trailer_updated = True
+                
+                if trailer_updated:
+                    logger.info(f"Updated trailer for {title}: {trailer_url}")
+                    self.stats["updated_trailers"] += 1
+                    changes_made = True
+                else:
+                    logger.info(f"Trailer already up to date for {title}")
+            else:
+                logger.info(f"No trailer information available for anime: {title}")
+            
             return changes_made
             
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
             logger.error(f"Error updating metadata for {title}: {str(e)}")
+            logger.debug(f"Detailed traceback for {title}: {error_details}")
             return False
     
     def _make_jikan_request(self, params):
@@ -748,6 +810,7 @@ Here's the text to translate:
             logger.info(f"Ratings updated: {self.stats['updated_ratings']}")
             logger.info(f"Genres updated: {self.stats['updated_genres']}")
             logger.info(f"Tags updated: {self.stats['updated_tags']}")
+            logger.info(f"Trailers updated: {self.stats['updated_trailers']}")
             logger.info(f"TV Show descriptions translated: {self.stats['translated_plots']}")
             
             if self.options.get('translate_episodes', False) or self.options.get('episodes_only', False) or self.is_default_mode:

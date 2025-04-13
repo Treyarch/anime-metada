@@ -27,7 +27,7 @@ This script processes a folder of anime series, updates ratings and genres from 
 
 - Uses the extracted title to search the Jikan API
 - Endpoint: https://api.jikan.moe/v4/anime?q={title}
-- Retrieves community score/rating, genres, and themes for the anime
+- Retrieves community score/rating, genres, themes, and trailer information for the anime
 
 
 4. Metadata Update
@@ -35,6 +35,7 @@ This script processes a folder of anime series, updates ratings and genres from 
 - Updates the <rating> tag in the tvshow.nfo file with the score from Jikan
 - Replaces all <genre> tags with genres from the Jikan API
 - Updates <tag> elements with theme data from the Jikan API
+- Updates <trailer> element with YouTube trailer links in Kodi-compatible format
 - Handles cases where anime titles might not match exactly
 
 

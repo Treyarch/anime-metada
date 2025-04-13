@@ -19,12 +19,7 @@
   <releasedate>2021-04-10</releasedate>
   <enddate>2021-06-19</enddate>
   <runtime>24</runtime>
-  <genre>Action</genre>
-  <genre>Drama</genre>
-  <genre>Sci-Fi</genre>
   <studio>Tokyo MX</studio>
-  <tag>Mecha</tag>
-  <tag>Military</tag>
   <anidbid>15441</anidbid>
   <tvdbid>378609</tvdbid>
   <tvdbslugid>eighty-six</tvdbslugid>
@@ -236,4 +231,4 @@
   <season>-1</season>
   <episode>-1</episode>
   <status>Ended</status>
-</tvshow>
+<tag>Mecha</tag><tag>Military</tag><genre>Action</genre><genre>Drama</genre><genre>Sci-Fi</genre></tvshow>
