@@ -1,23 +1,239 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <tvshow>
-    <title>Attack on Titan</title>
-    <originaltitle>進撃の巨人</originaltitle>
-    <showtitle>Attack on Titan</showtitle>
-    <year>2013</year>
-    <season>1</season>
-    <episode>25</episode>
-    <plot>Several hundred years ago, humans were nearly exterminated by giants. Giants are typically several stories tall, seem to have no intelligence, devour human beings and, worst of all, seem to do it for the pleasure rather than as a food source. A small percentage of humanity survived by building a city protected by extremely high walls, even taller than the biggest of giants. Flash forward to the present and the city has not seen a giant in over 100 years. Teenage boy Eren and his foster sister Mikasa witness something horrific as the city walls are destroyed by a super giant that appears out of thin air. As the smaller giants flood the city, the two kids watch in horror as their mother is eaten alive. Eren vows that he will murder every single giant and take revenge for all of mankind.</plot>
-    <outline>In a world where giant humanoids prey on humans, Eren Yeager joins the scouting legion to get revenge on the monsters who killed everyone in his town.</outline>
-    <premiered>2013-04-07</premiered>
-    <status>Ended</status>
-    <studio>Wit Studio</studio>
-    <mpaa>TV-MA</mpaa>
-    <actor>
-        <name>Yuki Kaji</name>
-        <role>Eren Yeager (voice)</role>
-    </actor>
-    <actor>
-        <name>Yui Ishikawa</name>
-        <role>Mikasa Ackerman (voice)</role>
-    </actor>
-<rating>8.56</rating><genre>Action</genre><genre>Award Winning</genre><genre>Drama</genre><genre>Suspense</genre><tag>Gore</tag><tag>Military</tag><tag>Survival</tag></tvshow>
+  <plot>Année stellaire 2148. Le district 86 a un passé étrange : tous ceux qui le dirigent deviendront fous. Le major Vladilena est obligé d'être leur nouveau chef et est déterminé à enquêter sur ce district.</plot>
+  <outline>Année stellaire 2148. Le district 86 a un passé étrange : tous ceux qui le dirigent deviendront fous. Le major Vladilena est obligé d'être leur nouveau chef et est déterminé à enquêter sur ce district.</outline>
+  <lockdata>false</lockdata>
+  <dateadded>2025-02-13 14:15:17</dateadded>
+  <title>86: Eighty Six</title>
+  <originaltitle>86: Eighty Six</originaltitle>
+  <director>Toshimasa Ishii</director>
+  <director>Tetsuya Kawakami</director>
+  <director>Mio Inoguchi</director>
+  <trailer>plugin://plugin.video.youtube/play/?video_id=WVegRUOgkPM</trailer>
+  <rating>8.32</rating>
+  <year>2021</year>
+  <mpaa>14+</mpaa>
+  <imdb_id>tt13718450</imdb_id>
+  <tmdbid>100565</tmdbid>
+  <premiered>2021-04-10</premiered>
+  <releasedate>2021-04-10</releasedate>
+  <enddate>2021-06-19</enddate>
+  <runtime>24</runtime>
+  <genre>Action</genre>
+  <genre>Drama</genre>
+  <genre>Sci-Fi</genre>
+  <studio>Tokyo MX</studio>
+  <tag>Mecha</tag>
+  <tag>Military</tag>
+  <anidbid>15441</anidbid>
+  <tvdbid>378609</tvdbid>
+  <tvdbslugid>eighty-six</tvdbslugid>
+  <art>
+    <poster>/data/medias/Anime/TV/86 Eighty-Six/folder.jpg</poster>
+    <fanart>/data/medias/Anime/TV/86 Eighty-Six/backdrop1.jpg</fanart>
+  </art>
+  <actor>
+    <name>Asato Asato</name>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Tetsuya Kawakami</name>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/T/Tetsuya Kawakami/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Toshiya Oono</name>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Pictures A-1</name>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Shouya Chiba</name>
+    <role>Shin`ei Nouzen</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/S/Shouya Chiba/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Ikumi Hasegawa</name>
+    <role>Vladilena Milize</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/I/Ikumi Hasegawa/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Saori Hayami</name>
+    <role>Anju Emma</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/S/Saori Hayami/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Riho Sugiyama</name>
+    <role>Henrietta Penrose</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/R/Riho Sugiyama/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Haruka Shiraishi</name>
+    <role>Kaye Tanya</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/H/Haruka Shiraishi/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Taishi Murata</name>
+    <role>Kujou Niko</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/T/Taishi Murata/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Sayumi Suzushiro</name>
+    <role>Kurena Kukumila</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/S/Sayumi Suzushiro/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Satoshi Mikami</name>
+    <role>Jerome Karlestar</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/S/Satoshi Mikami/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Natsumi Fujiwara</name>
+    <role>Theoto Rikka</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/N/Natsumi Fujiwara/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Haruki Ishiya</name>
+    <role>Daiya Iruma</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/H/Haruki Ishiya/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Masamu Ono</name>
+    <role>Chise Ousen</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/M/Masamu Ono/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Taito Ban</name>
+    <role>Touzan Sasha</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/T/Taito Ban/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Katsumi Fukuhara</name>
+    <role>Touma Soubi</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/K/Katsumi Fukuhara/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Daiki Yamashita</name>
+    <role>Hart Keets</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/D/Daiki Yamashita/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Mayuko Kazama</name>
+    <role>Maina Yatomika</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/M/Mayuko Kazama/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Yuka Nukui</name>
+    <role>Mikuri Kairou</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/Y/Yuka Nukui/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Seiichirou Yamashita</name>
+    <role>Raiden Shuga</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/S/Seiichirou Yamashita/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Shin'ei Ueki</name>
+    <role>Rui Kino</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Shizuka Ishigami</name>
+    <role>Rekka Rin</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/S/Shizuka Ishigami/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Taiten Kusunoki</name>
+    <role>Lev Aldrecht</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/T/Taiten Kusunoki/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Koutarou Shinohara</name>
+    <role>Kuroto Hinie</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/K/Koutarou Shinohara/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Makoto Furukawa</name>
+    <role>Shourei Nouzen</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/M/Makoto Furukawa/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Yoshino Aoyama</name>
+    <role>Shinjin (Onna)</role>
+    <type>Actor</type>
+    <thumb>/config/data/metadata/People/Y/Yoshino Aoyama/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Tomohiro Oono</name>
+    <role>Shinjin (Otoko)</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/T/Tomohiro Oono/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Yuuki Ishikari</name>
+    <role>Koushi</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/Y/Yuuki Ishikari/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Masaki Terasoma</name>
+    <role>Vaclav Milize</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/M/Masaki Terasoma/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Natsuki Miwa</name>
+    <role>Josei Caster</role>
+    <type>Actor</type>
+  </actor>
+  <actor>
+    <name>Kazumasa Nakamura</name>
+    <role>Pilot</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/K/Kazumasa Nakamura/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Asuna Tomari</name>
+    <role>Shin (Youshou)</role>
+    <type>Actor</type>
+    <thumb>/config/metadata/People/A/Asuna Tomari/folder.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Hiroyuki Sawano</name>
+    <type>Composer</type>
+  </actor>
+  <actor>
+    <name>Yamamoto Kohta</name>
+    <type>Composer</type>
+  </actor>
+  <id>378609</id>
+  <episodeguide>
+    <url cache="378609.xml">http://www.thetvdb.com/api/1D62F2F90030C444/series/378609/all/fr.zip</url>
+  </episodeguide>
+  <season>-1</season>
+  <episode>-1</episode>
+  <status>Ended</status>
+</tvshow>

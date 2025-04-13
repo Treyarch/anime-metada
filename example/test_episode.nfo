@@ -1,9 +1,84 @@
 ﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <episodedetails>
-  <plot>Cet épisode contient des caractères accentués comme é, è, à, ç et des caractères japonais: 進撃の巨人</plot>
-  <title>Test avec caractères spéciaux</title>
-  <originaltitle>テスト オリジナル</originaltitle>
-  <season>1</season>
+  <plot>La jeune Vladiléna est commandant dans l’armée de la république de San Magnolia. Sa carrière évoluera quand elle acceptera de prendre le commandement de l’escadron Spearhead, mené par un certain Undertaker et composé d’individus du non-existant 86e district.</plot>
+  <lockdata>false</lockdata>
+  <dateadded>2025-02-13 20:55:25</dateadded>
+  <title>Undertaker</title>
+  <originaltitle>アンダーテイカー</originaltitle>
+  <director>Toshimasa Ishii</director>
+  <writer>Toshiya Ōno</writer>
+  <credits>Toshiya Ōno</credits>
+  <year>2021</year>
+  <imdbid>tt14191412</imdbid>
+  <tvdbid>8261890</tvdbid>
+  <runtime>24</runtime>
+  <anidbid>238801</anidbid>
+  <art>
+    <poster>/data/medias/Anime/TV/86 Eighty-Six/86 Eighty-Six S01E01 MULTi BDRIP AAC x265-thumb.jpg</poster>
+  </art>
+  <showtitle>86: Eighty Six</showtitle>
   <episode>1</episode>
-  <showtitle>Série de Test</showtitle>
+  <season>1</season>
+  <aired>2021-04-11</aired>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>hevc</codec>
+        <micodec>hevc</micodec>
+        <bitrate>2367447</bitrate>
+        <width>1920</width>
+        <height>1080</height>
+        <aspect>16:9</aspect>
+        <aspectratio>16:9</aspectratio>
+        <framerate>23.976025</framerate>
+        <scantype>progressive</scantype>
+        <default>True</default>
+        <forced>False</forced>
+        <duration>23</duration>
+        <durationinseconds>1421</durationinseconds>
+      </video>
+      <audio>
+        <codec>aac</codec>
+        <micodec>aac</micodec>
+        <bitrate>192000</bitrate>
+        <language>fre</language>
+        <scantype>progressive</scantype>
+        <channels>2</channels>
+        <samplingrate>44100</samplingrate>
+        <default>True</default>
+        <forced>False</forced>
+      </audio>
+      <audio>
+        <codec>aac</codec>
+        <micodec>aac</micodec>
+        <bitrate>192000</bitrate>
+        <language>jpn</language>
+        <scantype>progressive</scantype>
+        <channels>2</channels>
+        <samplingrate>48000</samplingrate>
+        <default>False</default>
+        <forced>False</forced>
+      </audio>
+      <subtitle>
+        <codec>ass</codec>
+        <micodec>ass</micodec>
+        <width>0</width>
+        <height>0</height>
+        <language>fre</language>
+        <scantype>progressive</scantype>
+        <default>False</default>
+        <forced>False</forced>
+      </subtitle>
+      <subtitle>
+        <codec>ass</codec>
+        <micodec>ass</micodec>
+        <width>0</width>
+        <height>0</height>
+        <language>fre</language>
+        <scantype>progressive</scantype>
+        <default>True</default>
+        <forced>True</forced>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
 </episodedetails>
