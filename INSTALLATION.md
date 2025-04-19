@@ -52,6 +52,8 @@ With the `.env` file set up, you don't need to specify command-line arguments un
 - `--force-update`: Force update of ratings and MPAA values even if they already exist
 - `--sync-mpaa`: Sync MPAA rating from tvshow.nfo to all episode NFO files
 - `--remove-mpaa`: Remove MPAA rating from all episode NFO files
+- `--batch-mode`: Enable batch processing mode with configurable delays between API operations
+- `--batch-delay`: Set the delay in seconds between batch operations (default: 1.0)
 
 Command-line options take precedence over the settings in the `.env` file.
 
@@ -105,6 +107,12 @@ python src/anime_metadata_updater.py --sync-mpaa --force-update
 python src/anime_metadata_updater.py --remove-mpaa
 ```
 
+9. Process with batch mode to respect API rate limits (useful for large collections):
+
+```bash
+python src/anime_metadata_updater.py --batch-mode --batch-delay 2.0
+```
+
 ## Test with Example
 
 You can test the script with the included example:
@@ -132,6 +140,8 @@ The following environment variables can be set in the `.env` file:
 - `SYNC_MPAA`: Set to "true" to sync MPAA ratings
 - `FORCE_UPDATE`: Set to "true" to force update existing values
 - `REMOVE_MPAA`: Set to "true" to remove MPAA ratings
+- `BATCH_MODE`: Set to "true" to enable batch processing mode
+- `BATCH_DELAY`: Set a delay in seconds between API operations (default: 1.0)
 
 ## Logging
 

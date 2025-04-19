@@ -103,7 +103,8 @@ class AnimeMetadataUpdater:
             not self.options.get('sync_mpaa', False) and
             not self.options.get('remove_mpaa', False) and
             not self.options.get('translate_episodes', False) and
-            not self.options.get('episodes_only', False)
+            not self.options.get('episodes_only', False) and
+            not self.options.get('batch_mode', False)
         )
         
         # If we're in default mode, enable episode processing
@@ -114,6 +115,12 @@ class AnimeMetadataUpdater:
         self.jikan_requests = []  # Timestamps of recent requests
         self.jikan_minute_limit = 60  # Max 60 requests per minute
         self.jikan_second_limit = 3   # Max 3 requests per second
+        
+        # Rate limiting for Claude API and general batch processing
+        self.claude_requests = []  # Timestamps of Claude API requests
+        self.claude_minute_limit = 50  # Conservative limit for Claude API
+        self.claude_second_limit = 2   # Conservative limit for Claude API
+        self.batch_delay = self.options.get('batch_delay', 1.0)  # Default 1 second between batch operations
         
         self.stats = {
             "processed_files": 0,
@@ -127,6 +134,11 @@ class AnimeMetadataUpdater:
             "episode_titles_translated": 0,
             "episode_plots_translated": 0,
             "episodes_updated": 0,
+            "batch_operations": 0,
+            "batch_skipped": 0,
+            "jikan_api_calls": 0,
+            "claude_api_calls": 0,
+            "youtube_api_calls": 0,
             "errors": 0
         }
         
@@ -145,6 +157,10 @@ class AnimeMetadataUpdater:
         """Main method to run the updater."""
         logger.info("Starting anime metadata update process")
         
+        # Log batch mode if enabled
+        if self.options.get('batch_mode', False):
+            logger.info(f"Batch mode enabled with {self.batch_delay}s delay between operations")
+        
         # Check if we are only handling MPAA tags
         if self.options.get('sync_mpaa', False) or self.options.get('remove_mpaa', False):
             self._process_mpaa_tags()
@@ -162,7 +178,12 @@ class AnimeMetadataUpdater:
             if not episodes_only and 'tvshow.nfo' in files:
                 nfo_path = os.path.join(root, 'tvshow.nfo')
                 try:
+                    # Track batch operations
+                    if self.options.get('batch_mode', False):
+                        self.stats["batch_operations"] += 1
+                        
                     self._process_nfo_file(nfo_path)
+                    
                 except Exception as e:
                     logger.error(f"Error processing {nfo_path}: {str(e)}")
                     self.stats["errors"] += 1
@@ -179,7 +200,12 @@ class AnimeMetadataUpdater:
                     for episode_file in episode_files:
                         episode_path = os.path.join(root, episode_file)
                         try:
+                            # Track batch operations
+                            if self.options.get('batch_mode', False):
+                                self.stats["batch_operations"] += 1
+                                
                             self._process_episode_nfo(episode_path)
+                            
                         except Exception as e:
                             logger.error(f"Error processing episode {episode_path}: {str(e)}")
                             self.stats["errors"] += 1
@@ -221,6 +247,13 @@ class AnimeMetadataUpdater:
             for episode_file in episode_nfos:
                 episode_path = os.path.join(root, episode_file)
                 try:
+                    # Track batch operations
+                    if self.options.get('batch_mode', False):
+                        self.stats["batch_operations"] += 1
+                        # Apply batch delay if configured
+                        if self.batch_delay > 0:
+                            time.sleep(self.batch_delay)
+                    
                     if self.options.get('sync_mpaa', False):
                         self._add_mpaa_to_episode(episode_path, mpaa_value)
                     elif self.options.get('remove_mpaa', False):
@@ -582,8 +615,13 @@ class AnimeMetadataUpdater:
                 'key': self.youtube_api_key
             }
             
+            # Check for batch delay if applicable
+            if self.options.get('batch_mode', False) and self.batch_delay > 0:
+                time.sleep(self.batch_delay)
+            
             # Make the API request
             logger.info(f"Searching YouTube API for '{title}' trailer")
+            self.stats["youtube_api_calls"] += 1
             response = requests.get(api_url, params=params, timeout=10)
             
             # Check for API errors
@@ -651,6 +689,11 @@ class AnimeMetadataUpdater:
             # Add current request timestamp to the list
             current_time = time.time()
             self.jikan_requests.append(current_time)
+            self.stats["jikan_api_calls"] += 1
+            
+            # Check for batch delay if applicable
+            if self.options.get('batch_mode', False) and self.batch_delay > 0:
+                time.sleep(self.batch_delay)
             
             # Make the request
             response = requests.get(self.jikan_base_url, params=params)
@@ -662,6 +705,7 @@ class AnimeMetadataUpdater:
                 # Remove the failed request timestamp
                 if self.jikan_requests and self.jikan_requests[-1] == current_time:
                     self.jikan_requests.pop()
+                self.stats["jikan_api_calls"] -= 1  # Don't count failed requests
                 return self._make_jikan_request(params)
                 
             if response.status_code != 200:
@@ -716,14 +760,49 @@ class AnimeMetadataUpdater:
             logger.error(f"Error translating descriptions: {str(e)}")
             return False
     
+    def _apply_claude_rate_limits(self):
+        """Apply rate limiting for Claude API based on recent requests."""
+        current_time = time.time()
+        
+        # Remove requests older than 1 minute
+        self.claude_requests = [t for t in self.claude_requests if current_time - t < 60]
+        
+        # Check if we're over the per-minute limit
+        if len(self.claude_requests) >= self.claude_minute_limit:
+            # Calculate how long to wait
+            oldest = min(self.claude_requests)
+            wait_time = 60 - (current_time - oldest) + 0.1  # Add a small buffer
+            logger.info(f"Approaching Claude API per-minute rate limit, waiting {wait_time:.2f} seconds")
+            time.sleep(wait_time)
+            # Clear old requests after waiting
+            self.claude_requests = []
+            return
+        
+        # Check if we've made requests in the last 1/n second (to maintain n per second)
+        recent_requests = [t for t in self.claude_requests if current_time - t < (1.0 / self.claude_second_limit)]
+        if recent_requests:
+            # Calculate sleep time needed to maintain rate
+            wait_time = (1.0 / self.claude_second_limit) - (current_time - max(recent_requests))
+            if wait_time > 0:
+                time.sleep(wait_time)
+        
+        # Check for batch delay if applicable
+        if self.options.get('batch_mode', False) and self.batch_delay > 0:
+            time.sleep(self.batch_delay)
+            
     def _translate_text(self, text):
         """Use Claude API to translate text from English to French."""
         if not text or self.claude_client is None:
             return None
             
         try:
-            # Add a short delay to respect API rate limits
-            time.sleep(0.5)
+            # Apply rate limiting
+            self._apply_claude_rate_limits()
+            
+            # Add current request timestamp to the list
+            current_time = time.time()
+            self.claude_requests.append(current_time)
+            self.stats["claude_api_calls"] += 1
             
             # Get the model from options, with a default fallback
             model = self.options.get('claude_model', 'claude-3-5-haiku-latest')
@@ -892,7 +971,22 @@ Here's the text to translate:
                 logger.info(f"Episode files with translations: {self.stats['episodes_translated']}")
                 logger.info(f"Episode titles translated: {self.stats['episode_titles_translated']}")
                 logger.info(f"Episode plots translated: {self.stats['episode_plots_translated']}")
+        
+        # API call statistics
+        logger.info("-" * 50)
+        logger.info("API CALL STATISTICS")
+        logger.info(f"Jikan API calls: {self.stats['jikan_api_calls']}")
+        logger.info(f"Claude API calls: {self.stats['claude_api_calls']}")
+        logger.info(f"YouTube API calls: {self.stats['youtube_api_calls']}")
+        
+        # Batch mode statistics if enabled
+        if self.options.get('batch_mode', False):
+            logger.info("-" * 50)
+            logger.info("BATCH PROCESSING STATISTICS")
+            logger.info(f"Batch operations: {self.stats['batch_operations']}")
+            logger.info(f"Batch delay: {self.batch_delay} seconds")
             
+        logger.info("-" * 50)
         logger.info(f"Errors encountered: {self.stats['errors']}")
         logger.info("=" * 50)
 
@@ -916,6 +1010,13 @@ def load_environment():
     env_remove_mpaa = os.getenv('REMOVE_MPAA', '').lower() == 'true'
     env_translate_episodes = os.getenv('TRANSLATE_EPISODES', '').lower() == 'true'
     env_episodes_only = os.getenv('EPISODES_ONLY', '').lower() == 'true'
+    env_batch_mode = os.getenv('BATCH_MODE', '').lower() == 'true'
+    
+    # Parse numeric options
+    try:
+        env_batch_delay = float(os.getenv('BATCH_DELAY', '1.0'))
+    except (ValueError, TypeError):
+        env_batch_delay = 1.0
     
     return {
         'folder': env_folder,
@@ -928,7 +1029,9 @@ def load_environment():
         'force_update': env_force_update,
         'remove_mpaa': env_remove_mpaa,
         'translate_episodes': env_translate_episodes,
-        'episodes_only': env_episodes_only
+        'episodes_only': env_episodes_only,
+        'batch_mode': env_batch_mode,
+        'batch_delay': env_batch_delay
     }
 
 
@@ -963,6 +1066,10 @@ def parse_arguments():
                         help="Translate plot and title in episode NFO files")
     parser.add_argument("--episodes-only", action="store_true", default=env_vars['episodes_only'],
                         help="Only process episode files, skip tvshow.nfo")
+    parser.add_argument("--batch-mode", action="store_true", default=env_vars['batch_mode'],
+                        help="Enable batch processing mode with configurable delays between operations")
+    parser.add_argument("--batch-delay", type=float, default=env_vars['batch_delay'],
+                        help="Delay in seconds between batch operations (default: 1.0)")
     
     args = parser.parse_args()
     
@@ -999,8 +1106,14 @@ def main():
             "remove_mpaa": args.remove_mpaa,
             "translate_episodes": args.translate_episodes,
             "episodes_only": args.episodes_only,
-            "claude_model": args.claude_model
+            "claude_model": args.claude_model,
+            "batch_mode": args.batch_mode,
+            "batch_delay": args.batch_delay
         }
+        
+        # Log batch mode settings if enabled
+        if args.batch_mode:
+            logger.info(f"Batch mode enabled with delay: {args.batch_delay} seconds between operations")
         
         updater = AnimeMetadataUpdater(
             folder_path=args.folder,

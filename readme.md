@@ -113,3 +113,16 @@ python anime_metadata_updater.py --folder "/path/to/anime/collection" --sync-mpa
 # Remove MPAA ratings from all episode files
 python anime_metadata_updater.py --folder "/path/to/anime/collection" --remove-mpaa
 ```
+
+## Batch Processing Examples
+
+```bash
+# Enable batch mode with default 1-second delay between operations
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --batch-mode
+
+# Set a custom delay of 2.5 seconds between operations
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --batch-mode --batch-delay 2.5
+
+# Combine batch mode with other options
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --batch-mode --batch-delay 1.5 --skip-translate
+```
