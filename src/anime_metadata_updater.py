@@ -122,6 +122,11 @@ class AnimeMetadataUpdater:
         self.claude_second_limit = 2   # Conservative limit for Claude API
         self.batch_delay = self.options.get('batch_delay', 1.0)  # Default 1 second between batch operations
         
+        # Folder processing limits
+        self.max_folders = self.options.get('max_folders', 0)  # 0 means process all folders
+        self.folder_offset = self.options.get('folder_offset', 0)  # 0 means start from the beginning
+        self.processed_folders = 0
+        
         self.stats = {
             "processed_files": 0,
             "updated_ratings": 0,
@@ -136,6 +141,9 @@ class AnimeMetadataUpdater:
             "episodes_updated": 0,
             "batch_operations": 0,
             "batch_skipped": 0,
+            "folders_processed": 0,
+            "folders_skipped_limit": 0,
+            "folders_skipped_offset": 0,
             "jikan_api_calls": 0,
             "claude_api_calls": 0,
             "youtube_api_calls": 0,
@@ -161,9 +169,17 @@ class AnimeMetadataUpdater:
         if self.options.get('batch_mode', False):
             logger.info(f"Batch mode enabled with {self.batch_delay}s delay between operations")
         
+        # Log folder limit if set
+        if self.max_folders > 0:
+            logger.info(f"Folder limit set: processing up to {self.max_folders} folders")
+            
+        # Log folder offset if set
+        if self.folder_offset > 0:
+            logger.info(f"Folder offset set: skipping first {self.folder_offset} folders")
+        
         # Check if we are only handling MPAA tags
         if self.options.get('sync_mpaa', False) or self.options.get('remove_mpaa', False):
-            self._process_mpaa_tags()
+            self._process_mpaa_tags_with_limit()
             self._print_summary()
             return
         
@@ -172,45 +188,223 @@ class AnimeMetadataUpdater:
         if episodes_only:
             logger.info("Processing episode files only (skipping tvshow.nfo files)")
         
-        # Process folders
-        for root, dirs, files in os.walk(self.folder_path):
-            # Process tvshow.nfo if not in episodes-only mode
-            if not episodes_only and 'tvshow.nfo' in files:
-                nfo_path = os.path.join(root, 'tvshow.nfo')
-                try:
-                    # Track batch operations
-                    if self.options.get('batch_mode', False):
-                        self.stats["batch_operations"] += 1
-                        
-                    self._process_nfo_file(nfo_path)
-                    
-                except Exception as e:
-                    logger.error(f"Error processing {nfo_path}: {str(e)}")
-                    self.stats["errors"] += 1
+        # Get a list of all subfolders first if we have a folder limit or offset
+        if self.max_folders > 0 or self.folder_offset > 0:
+            all_folders = self._get_anime_folders()
+            total_folders = len(all_folders)
+            logger.info(f"Found {total_folders} total anime folders")
             
-            # Check if we need to process episode files
-            # Added default mode processing for episode files
-            if self.options.get('translate_episodes', False) or episodes_only or self.is_default_mode:
-                # Get all episode NFO files in this folder
-                episode_files = [f for f in files if f.endswith('.nfo') and f != 'tvshow.nfo']
+            # Apply offset if specified
+            start_index = min(self.folder_offset, total_folders)
+            if start_index > 0:
+                self.stats["folders_skipped_offset"] = start_index
+                logger.info(f"Skipping first {start_index} folders due to offset")
                 
-                if episode_files:
-                    logger.info(f"Found {len(episode_files)} episode NFO files in {root}")
+            # Apply limit if specified
+            if self.max_folders > 0:
+                end_index = min(start_index + self.max_folders, total_folders)
+                skipped_due_to_limit = total_folders - end_index
+                self.stats["folders_skipped_limit"] = skipped_due_to_limit
+                logger.info(f"Will process {end_index - start_index} folders (from index {start_index} to {end_index-1})")
+            else:
+                end_index = total_folders
+                logger.info(f"Will process all remaining {end_index - start_index} folders after offset")
+            
+            # Get the slice of folders to process
+            folders_to_process = all_folders[start_index:end_index]
+            
+            # Process each selected folder
+            for folder in folders_to_process:
+                self._process_single_folder(folder, episodes_only)
+                self.stats["folders_processed"] += 1
+        else:
+            # No limit - process everything using os.walk
+            for root, dirs, files in os.walk(self.folder_path):
+                # If this folder contains a tvshow.nfo, consider it an anime folder
+                if 'tvshow.nfo' in files:
+                    self.stats["folders_processed"] += 1
                     
-                    for episode_file in episode_files:
-                        episode_path = os.path.join(root, episode_file)
+                    # Process tvshow.nfo if not in episodes-only mode
+                    if not episodes_only:
+                        nfo_path = os.path.join(root, 'tvshow.nfo')
                         try:
                             # Track batch operations
                             if self.options.get('batch_mode', False):
                                 self.stats["batch_operations"] += 1
                                 
-                            self._process_episode_nfo(episode_path)
+                            self._process_nfo_file(nfo_path)
                             
                         except Exception as e:
-                            logger.error(f"Error processing episode {episode_path}: {str(e)}")
+                            logger.error(f"Error processing {nfo_path}: {str(e)}")
                             self.stats["errors"] += 1
+                
+                # Check if we need to process episode files
+                if self.options.get('translate_episodes', False) or episodes_only or self.is_default_mode:
+                    # Get all episode NFO files in this folder
+                    episode_files = [f for f in files if f.endswith('.nfo') and f != 'tvshow.nfo']
+                    
+                    if episode_files:
+                        logger.info(f"Found {len(episode_files)} episode NFO files in {root}")
+                        
+                        for episode_file in episode_files:
+                            episode_path = os.path.join(root, episode_file)
+                            try:
+                                # Track batch operations
+                                if self.options.get('batch_mode', False):
+                                    self.stats["batch_operations"] += 1
+                                    
+                                self._process_episode_nfo(episode_path)
+                                
+                            except Exception as e:
+                                logger.error(f"Error processing episode {episode_path}: {str(e)}")
+                                self.stats["errors"] += 1
         
         self._print_summary()
+        
+    def _get_anime_folders(self):
+        """
+        Get a list of all anime folders (folders containing tvshow.nfo)
+        Returns a list of folder paths sorted alphabetically
+        """
+        anime_folders = []
+        
+        for root, dirs, files in os.walk(self.folder_path):
+            if 'tvshow.nfo' in files:
+                anime_folders.append(root)
+        
+        # Sort folders alphabetically for consistent processing order
+        anime_folders.sort()
+        return anime_folders
+        
+    def _process_single_folder(self, folder_path, episodes_only=False):
+        """Process a single anime folder (both tvshow.nfo and episode files)"""
+        logger.info(f"Processing folder: {folder_path}")
+        
+        # Get all files in this folder
+        files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
+        
+        # Process tvshow.nfo if not in episodes-only mode
+        if not episodes_only and 'tvshow.nfo' in files:
+            nfo_path = os.path.join(folder_path, 'tvshow.nfo')
+            try:
+                # Track batch operations
+                if self.options.get('batch_mode', False):
+                    self.stats["batch_operations"] += 1
+                    
+                self._process_nfo_file(nfo_path)
+                
+            except Exception as e:
+                logger.error(f"Error processing {nfo_path}: {str(e)}")
+                self.stats["errors"] += 1
+        
+        # Check if we need to process episode files
+        if self.options.get('translate_episodes', False) or episodes_only or self.is_default_mode:
+            # Get all episode NFO files in this folder
+            episode_files = [f for f in files if f.endswith('.nfo') and f != 'tvshow.nfo']
+            
+            if episode_files:
+                logger.info(f"Found {len(episode_files)} episode NFO files in {folder_path}")
+                
+                for episode_file in episode_files:
+                    episode_path = os.path.join(folder_path, episode_file)
+                    try:
+                        # Track batch operations
+                        if self.options.get('batch_mode', False):
+                            self.stats["batch_operations"] += 1
+                            
+                        self._process_episode_nfo(episode_path)
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing episode {episode_path}: {str(e)}")
+                        self.stats["errors"] += 1
+                        
+    def _process_mpaa_tags_with_limit(self):
+        """Process MPAA tags in episode NFO files based on tvshow.nfo with folder limit."""
+        logger.info("Starting MPAA tag processing with folder limit")
+        
+        # Get anime folders if we have a limit or offset
+        if self.max_folders > 0 or self.folder_offset > 0:
+            all_folders = self._get_anime_folders()
+            total_folders = len(all_folders)
+            logger.info(f"Found {total_folders} total anime folders")
+            
+            # Apply offset if specified
+            start_index = min(self.folder_offset, total_folders)
+            if start_index > 0:
+                self.stats["folders_skipped_offset"] = start_index
+                logger.info(f"Skipping first {start_index} folders due to offset")
+                
+            # Apply limit if specified
+            if self.max_folders > 0:
+                end_index = min(start_index + self.max_folders, total_folders)
+                skipped_due_to_limit = total_folders - end_index
+                self.stats["folders_skipped_limit"] = skipped_due_to_limit
+                logger.info(f"Will process {end_index - start_index} folders (from index {start_index} to {end_index-1})")
+            else:
+                end_index = total_folders
+                logger.info(f"Will process all remaining {end_index - start_index} folders after offset")
+            
+            # Get the slice of folders to process
+            folders_to_process = all_folders[start_index:end_index]
+            
+            # Process each selected folder
+            for folder in folders_to_process:
+                self._process_mpaa_for_folder(folder)
+                self.stats["folders_processed"] += 1
+        else:
+            # No limit, process all folders
+            for root, dirs, files in os.walk(self.folder_path):
+                if 'tvshow.nfo' in files:
+                    self.stats["folders_processed"] += 1
+                    self._process_mpaa_for_folder(root)
+                    
+    def _process_mpaa_for_folder(self, folder_path):
+        """Process MPAA tags for a single folder."""
+        logger.info(f"Processing MPAA tags for folder: {folder_path}")
+        
+        # Check if there's a tvshow.nfo file
+        tvshow_path = os.path.join(folder_path, 'tvshow.nfo')
+        if not os.path.exists(tvshow_path):
+            logger.warning(f"No tvshow.nfo found in {folder_path}, skipping")
+            return
+        
+        if self.options.get('sync_mpaa', False):
+            # Get the MPAA rating from tvshow.nfo
+            mpaa_value = self._get_mpaa_from_tvshow(tvshow_path)
+            if not mpaa_value:
+                logger.warning(f"No MPAA tag found in {tvshow_path}, skipping folder")
+                return
+            
+            logger.info(f"Found MPAA rating '{mpaa_value}' in {tvshow_path}")
+        
+        # Find all episode NFO files in this folder
+        files = os.listdir(folder_path)
+        episode_nfos = [f for f in files if f.endswith('.nfo') and f != 'tvshow.nfo']
+        
+        if not episode_nfos:
+            logger.info(f"No episode NFO files found in {folder_path}")
+            return
+        
+        logger.info(f"Found {len(episode_nfos)} episode NFO files in {folder_path}")
+        
+        # Process each episode NFO file
+        for episode_file in episode_nfos:
+            episode_path = os.path.join(folder_path, episode_file)
+            try:
+                # Track batch operations
+                if self.options.get('batch_mode', False):
+                    self.stats["batch_operations"] += 1
+                    # Apply batch delay if configured
+                    if self.batch_delay > 0:
+                        time.sleep(self.batch_delay)
+                
+                if self.options.get('sync_mpaa', False):
+                    self._add_mpaa_to_episode(episode_path, mpaa_value)
+                elif self.options.get('remove_mpaa', False):
+                    self._remove_mpaa_from_episode(episode_path)
+            except Exception as e:
+                logger.error(f"Error processing episode {episode_path}: {str(e)}")
+                self.stats["errors"] += 1
     
     def _process_mpaa_tags(self):
         """Process MPAA tags in episode NFO files based on tvshow.nfo."""
@@ -956,6 +1150,20 @@ Here's the text to translate:
         logger.info("PROCESSING COMPLETE")
         logger.info("=" * 50)
         
+        # Folder processing statistics
+        logger.info("FOLDER PROCESSING STATISTICS")
+        logger.info(f"Folders processed: {self.stats['folders_processed']}")
+        
+        if self.folder_offset > 0:
+            logger.info(f"Folders skipped due to offset: {self.stats['folders_skipped_offset']}")
+            logger.info(f"Folder offset: {self.folder_offset}")
+            
+        if self.max_folders > 0:
+            logger.info(f"Folders skipped due to limit: {self.stats['folders_skipped_limit']}")
+            logger.info(f"Folder limit: {self.max_folders}")
+            
+        logger.info("-" * 50)
+        
         if self.options.get('sync_mpaa', False) or self.options.get('remove_mpaa', False):
             logger.info(f"Episode NFO files updated: {self.stats['episodes_updated']}")
         else:
@@ -1017,6 +1225,16 @@ def load_environment():
         env_batch_delay = float(os.getenv('BATCH_DELAY', '1.0'))
     except (ValueError, TypeError):
         env_batch_delay = 1.0
+        
+    try:
+        env_max_folders = int(os.getenv('MAX_FOLDERS', '0'))
+    except (ValueError, TypeError):
+        env_max_folders = 0
+        
+    try:
+        env_folder_offset = int(os.getenv('FOLDER_OFFSET', '0'))
+    except (ValueError, TypeError):
+        env_folder_offset = 0
     
     return {
         'folder': env_folder,
@@ -1031,7 +1249,9 @@ def load_environment():
         'translate_episodes': env_translate_episodes,
         'episodes_only': env_episodes_only,
         'batch_mode': env_batch_mode,
-        'batch_delay': env_batch_delay
+        'batch_delay': env_batch_delay,
+        'max_folders': env_max_folders,
+        'folder_offset': env_folder_offset
     }
 
 
@@ -1070,6 +1290,10 @@ def parse_arguments():
                         help="Enable batch processing mode with configurable delays between operations")
     parser.add_argument("--batch-delay", type=float, default=env_vars['batch_delay'],
                         help="Delay in seconds between batch operations (default: 1.0)")
+    parser.add_argument("--max-folders", type=int, default=env_vars['max_folders'],
+                        help="Maximum number of subfolders to process (0 means process all, default: 0)")
+    parser.add_argument("--folder-offset", type=int, default=env_vars['folder_offset'],
+                        help="Number of folders to skip before starting processing (default: 0)")
     
     args = parser.parse_args()
     
@@ -1108,12 +1332,22 @@ def main():
             "episodes_only": args.episodes_only,
             "claude_model": args.claude_model,
             "batch_mode": args.batch_mode,
-            "batch_delay": args.batch_delay
+            "batch_delay": args.batch_delay,
+            "max_folders": args.max_folders,
+            "folder_offset": args.folder_offset
         }
         
         # Log batch mode settings if enabled
         if args.batch_mode:
             logger.info(f"Batch mode enabled with delay: {args.batch_delay} seconds between operations")
+            
+        # Log folder limit if set
+        if args.max_folders > 0:
+            logger.info(f"Folder limit set to {args.max_folders} subfolders")
+            
+        # Log folder offset if set
+        if args.folder_offset > 0:
+            logger.info(f"Folder offset set to {args.folder_offset} subfolders")
         
         updater = AnimeMetadataUpdater(
             folder_path=args.folder,

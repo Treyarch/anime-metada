@@ -126,3 +126,22 @@ python anime_metadata_updater.py --folder "/path/to/anime/collection" --batch-mo
 # Combine batch mode with other options
 python anime_metadata_updater.py --folder "/path/to/anime/collection" --batch-mode --batch-delay 1.5 --skip-translate
 ```
+
+## Folder Limit and Offset Examples
+
+```bash
+# Process only the first 5 anime folders in alphabetical order
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --max-folders 5
+
+# Process 10 folders with batch mode enabled
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --max-folders 10 --batch-mode
+
+# Process a limited number of folders with MPAA sync
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --max-folders 20 --sync-mpaa
+
+# Skip the first 30 folders and process the next 10
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --folder-offset 30 --max-folders 10
+
+# Process all folders after the first 50
+python anime_metadata_updater.py --folder "/path/to/anime/collection" --folder-offset 50
+```

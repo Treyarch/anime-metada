@@ -54,6 +54,8 @@ With the `.env` file set up, you don't need to specify command-line arguments un
 - `--remove-mpaa`: Remove MPAA rating from all episode NFO files
 - `--batch-mode`: Enable batch processing mode with configurable delays between API operations
 - `--batch-delay`: Set the delay in seconds between batch operations (default: 1.0)
+- `--max-folders`: Set maximum number of subfolders to process (0 means process all, default: 0)
+- `--folder-offset`: Number of folders to skip before starting processing (default: 0)
 
 Command-line options take precedence over the settings in the `.env` file.
 
@@ -113,6 +115,18 @@ python src/anime_metadata_updater.py --remove-mpaa
 python src/anime_metadata_updater.py --batch-mode --batch-delay 2.0
 ```
 
+10. Process only a limited number of subfolders (useful for testing or large collections):
+
+```bash
+python src/anime_metadata_updater.py --max-folders 5
+```
+
+11. Skip the first 20 folders and process the next 10 (useful for continuing a previous run):
+
+```bash
+python src/anime_metadata_updater.py --folder-offset 20 --max-folders 10
+```
+
 ## Test with Example
 
 You can test the script with the included example:
@@ -142,6 +156,8 @@ The following environment variables can be set in the `.env` file:
 - `REMOVE_MPAA`: Set to "true" to remove MPAA ratings
 - `BATCH_MODE`: Set to "true" to enable batch processing mode
 - `BATCH_DELAY`: Set a delay in seconds between API operations (default: 1.0)
+- `MAX_FOLDERS`: Set maximum number of subfolders to process (0 means process all)
+- `FOLDER_OFFSET`: Number of folders to skip before starting processing (default: 0)
 
 ## Logging
 
