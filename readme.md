@@ -9,6 +9,40 @@ This script processes a folder of anime series, updates ratings and genres from 
 - Claude API key for translation (optional if only updating metadata)
 - YouTube Data API key for trailer search (optional if using Jikan API trailers only)
 
+## Code Structure
+
+The codebase is organized into the following modules and packages:
+
+```
+├── anime_metadata_updater.py   # Entry point script (run this)
+├── src/                        # Source code package
+│   ├── __init__.py             # Package initialization
+│   ├── main.py                 # Main implementation script
+│   ├── config/                 # Configuration handling
+│   │   ├── __init__.py
+│   │   └── configuration.py    # Command line and environment config
+│   ├── core/                   # Core functionality
+│   │   ├── __init__.py
+│   │   ├── updater.py          # Main AnimeMetadataUpdater class
+│   │   └── stats.py            # Statistics tracking
+│   ├── utils/                  # Utility functions
+│   │   ├── __init__.py
+│   │   ├── file_utils.py       # File operations (read/write XML)
+│   │   ├── folder_utils.py     # Folder traversal and management
+│   │   └── language_utils.py   # Language detection and text processing
+│   ├── api/                    # API integrations
+│   │   ├── __init__.py
+│   │   ├── jikan_api.py        # Jikan API with rate limiting
+│   │   ├── claude_api.py       # Claude API for translation
+│   │   └── youtube_api.py      # YouTube API for trailers
+│   └── processors/             # File processors
+│       ├── __init__.py
+│       ├── nfo_processor.py    # Processing for tvshow.nfo files
+│       ├── episode_processor.py # Processing for episode NFO files
+│       └── mpaa_processor.py   # MPAA tag management
+└── tests/                      # Test directory
+```
+
 ## Script Functionality
 
 1. Folder Traversal
@@ -83,11 +117,13 @@ This script processes a folder of anime series, updates ratings and genres from 
 - Generates a summary of changes made upon completion
 
 
-## Configuration
+## Quick Start
 
-- Store the Claude API key securely (optional if only updating metadata)
-- Allow configuration of source folder path via command line arguments
-- Provide options to only update ratings or only translate descriptions
+1. Install dependencies: `pip install -r requirements.txt`
+2. Set up your .env file with API keys and folder path
+3. Run the script: `python anime_metadata_updater.py`
+
+For detailed installation and configuration instructions, see [INSTALLATION.md](INSTALLATION.md).
 
 ## Usage Example
 

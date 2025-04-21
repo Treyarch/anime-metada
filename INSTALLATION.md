@@ -31,12 +31,31 @@ pip install -r requirements.txt
      REMOVE_MPAA=true
      ```
 
+## Project Structure
+
+The codebase has been organized into a modular structure for better maintainability:
+
+```
+├── anime_metadata_updater.py   # Entry point script (run this)
+├── src/                        # Source code package
+│   ├── __init__.py             # Package initialization
+│   ├── main.py                 # Main implementation script
+│   ├── config/                 # Configuration handling
+│   ├── core/                   # Core functionality
+│   ├── utils/                  # Utility functions
+│   ├── api/                    # API integrations
+│   └── processors/             # File processors
+└── tests/                      # Test directory
+```
+
+This modular design makes the code easier to understand, test, and extend.
+
 ## Usage
 
 The basic command to run the script is:
 
 ```bash
-python src/anime_metadata_updater.py
+python anime_metadata_updater.py
 ```
 
 With the `.env` file set up, you don't need to specify command-line arguments unless you want to override the defaults.
@@ -64,67 +83,67 @@ Command-line options take precedence over the settings in the `.env` file.
 1. Update ratings, genres, tags, trailers, and translate descriptions:
 
 ```bash
-python src/anime_metadata_updater.py
+python anime_metadata_updater.py
 ```
 
 2. Only update ratings, genres, and tags (no translation):
 
 ```bash
-python src/anime_metadata_updater.py --rating-only
+python anime_metadata_updater.py --rating-only
 ```
 
 3. Only translate descriptions (no rating updates):
 
 ```bash
-python src/anime_metadata_updater.py --translate-only
+python anime_metadata_updater.py --translate-only
 ```
 
 4. Only update ratings and genres and skip translation entirely (no need for Claude API key):
 
 ```bash
-python src/anime_metadata_updater.py --skip-translate
+python anime_metadata_updater.py --skip-translate
 ```
 
 5. Process a specific anime folder (overriding the ANIME_FOLDER in .env):
 
 ```bash
-python src/anime_metadata_updater.py --folder "D:\anime\collection\Attack on Titan"
+python anime_metadata_updater.py --folder "D:\anime\collection\Attack on Titan"
 ```
 
 6. Sync MPAA ratings from tvshow.nfo to all episode NFO files:
 
 ```bash
-python src/anime_metadata_updater.py --sync-mpaa
+python anime_metadata_updater.py --sync-mpaa
 ```
 
 7. Force update MPAA ratings from tvshow.nfo to all episode NFO files (updates even if they already match):
 
 ```bash
-python src/anime_metadata_updater.py --sync-mpaa --force-update
+python anime_metadata_updater.py --sync-mpaa --force-update
 ```
 
 8. Remove MPAA ratings from all episode NFO files:
 
 ```bash
-python src/anime_metadata_updater.py --remove-mpaa
+python anime_metadata_updater.py --remove-mpaa
 ```
 
 9. Process with batch mode to respect API rate limits (useful for large collections):
 
 ```bash
-python src/anime_metadata_updater.py --batch-mode --batch-delay 2.0
+python anime_metadata_updater.py --batch-mode --batch-delay 2.0
 ```
 
 10. Process only a limited number of subfolders (useful for testing or large collections):
 
 ```bash
-python src/anime_metadata_updater.py --max-folders 5
+python anime_metadata_updater.py --max-folders 5
 ```
 
 11. Skip the first 20 folders and process the next 10 (useful for continuing a previous run):
 
 ```bash
-python src/anime_metadata_updater.py --folder-offset 20 --max-folders 10
+python anime_metadata_updater.py --folder-offset 20 --max-folders 10
 ```
 
 ## Test with Example
@@ -133,13 +152,13 @@ You can test the script with the included example:
 
 ```bash
 # Test MPAA sync functionality
-python src/anime_metadata_updater.py --folder "D:\www\anime-metadata\example" --sync-mpaa
+python anime_metadata_updater.py --folder "D:\www\anime-metadata\example" --sync-mpaa
 
 # Test MPAA removal functionality
-python src/anime_metadata_updater.py --folder "D:\www\anime-metadata\example" --remove-mpaa
+python anime_metadata_updater.py --folder "D:\www\anime-metadata\example" --remove-mpaa
 
 # Test normal functionality
-python src/anime_metadata_updater.py --folder "D:\www\anime-metadata\example" --skip-translate
+python anime_metadata_updater.py --folder "D:\www\anime-metadata\example" --skip-translate
 ```
 
 ## Environment Variables
@@ -149,6 +168,7 @@ The following environment variables can be set in the `.env` file:
 - `ANIME_FOLDER`: Path to your anime collection folder
 - `CLAUDE_API_KEY`: Your Claude API key
 - `YOUTUBE_API_KEY`: Your YouTube Data API key
+- `CLAUDE_MODEL`: Claude model to use (default: "claude-3-5-haiku-latest")
 - `SKIP_TRANSLATE`: Set to "true" to skip translation
 - `RATING_ONLY`: Set to "true" to only update ratings
 - `SYNC_MPAA`: Set to "true" to sync MPAA ratings
@@ -162,3 +182,23 @@ The following environment variables can be set in the `.env` file:
 ## Logging
 
 The script generates log output to both the console and a file named `anime_metadata_updater.log`. Check this file for detailed information about the script's execution.
+
+## Development
+
+To extend the functionality:
+
+1. **API Modules**: Add new API integrations in the `src/api/` directory
+2. **Processors**: Add new file processors in the `src/processors/` directory
+3. **Utilities**: Add shared utility functions in the `src/utils/` directory
+
+The modular structure makes it easy to add new features or modify existing behavior without changing the entire codebase.
+
+### Running from Source Directory
+
+If you prefer to run the module directly from the source directory, use:
+
+```bash
+python -m src.main
+```
+
+This alternative method ensures proper Python module resolution.
